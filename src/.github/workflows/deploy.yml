@@ -8,12 +8,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4 # Actualitzat a v4
+        uses: actions/checkout@v4
 
       - name: Setup Node
-        uses: actions/setup-node@v4 # Afegim aquest pas per fixar la versió
+        uses: actions/setup-node@v4
         with:
-          node-version: 22 # Una versió estable i moderna
+          node-version: 20
 
       - name: Install and Build
         run: |
