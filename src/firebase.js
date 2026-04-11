@@ -3,7 +3,8 @@ import { getFirestore } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCYikRWiEEvEYlZFHQaWzE-2Ry5zWFcfC4",
+  // Ara utilitzem la variable d'entorn en lloc d'escriure la clau directament
+  apiKey: import.meta.env.VITE_FIREBASE_KEY, 
   authDomain: "app-mates.firebaseapp.com",
   projectId: "app-mates",
   storageBucket: "app-mates.firebasestorage.app",

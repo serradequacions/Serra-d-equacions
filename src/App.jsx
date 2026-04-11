@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { db, auth } from './firebase'; 
-import { collection, onSnapshot, doc, setDoc, getDoc, addDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, onSnapshot, doc, setDoc, getDoc, addDoc, updateDoc, deleteDoc, serverTimestamp, getDocs } from 'firebase/firestore'; // Afegit getDocs
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from 'firebase/auth';
 import logoMates from './logo.png';
-import logoInstagram from './logo-instagram.png'; // Importem el teu logo d'Instagram
+import logoInstagram from './logo-instagram.png'; 
 
 function App() {
   const [user, setUser] = useState(null);
@@ -17,13 +17,15 @@ function App() {
   const [avisos, setAvisos] = useState([]); 
   const [loading, setLoading] = useState(true);
 
-  // ESTATS ADMIN RECUPERATS
+  // ESTATS ADMIN
   const [modeAdminActiu, setModeAdminActiu] = useState(true); 
   const [cursSimulat, setCursSimulat] = useState('1r ESO');
   const [nouAviso, setNouAviso] = useState('');
   const [cursosSeleccionatsAviso, setCursosSeleccionatsAviso] = useState([]);
   const [nomMat, setNomMat] = useState('');
   const [urlMat, setUrlMat] = useState('');
+  const [temaMat, setTemaMat] = useState(''); 
+  const [temaExistent, setTemaExistent] = useState(''); 
   const [cursosSeleccionatsMat, setCursosSeleccionatsMat] = useState([]);
 
   const adminEmail = "serradequacions@gmail.com"; 
@@ -59,6 +61,62 @@ function App() {
     }
   }, [user]);
 
+  // --- NOVA FUNCIÓ PER ENVIAR EMAILS ---
+  const enviarEmailsBrevo = async (cursSeleccionat, textAviso) => {
+    const usuarisRef = collection(db, "usuaris");
+    const querySnapshot = await getDocs(usuarisRef);
+    const destinataris = querySnapshot.docs
+      .map(doc => doc.data())
+      .filter(u => u.curs === cursSeleccionat)
+      .map(u => ({ email: u.email }));
+
+    if (destinataris.length === 0) return;
+
+    try {
+      await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: {
+          'accept': 'application/json',
+          'api-key': import.meta.env.VITE_BREVO_API_KEY, // RECORDA CANVIAR AIXÒ
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          sender: { name: "Serra d'Equacions", email: "serradequacions@gmail.com" },
+          to: destinataris,
+          subject: `Nou avís de Matemàtiques - ${cursSeleccionat}`,
+          htmlContent: `
+            <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #eee;">
+              <h2 style="color: #27ae60;">Nou avís publicat</h2>
+              <p>Hola! S'ha publicat un nou avís per al curs <strong>${cursSeleccionat}</strong>:</p>
+              <blockquote style="background: #f9f9f9; padding: 15px; border-left: 5px solid #27ae60;">
+                ${textAviso}
+              </blockquote>
+              <p>Pots consultar tota la informació a la web:</p>
+              <a href="https://serradequacions.github.io" style="display: inline-block; padding: 10px 20px; background-color: #27ae60; color: white; text-decoration: none; border-radius: 5px;">Anar a Serra d'Equacions</a>
+            </div>`
+        })
+      });
+    } catch (error) {
+      console.error("Error enviant correus:", error);
+    }
+  };
+  // -------------------------------------
+
+  const handleAuth = async (e) => {
+    e.preventDefault();
+    try {
+      if (isRegistering) {
+        const res = await createUserWithEmailAndPassword(auth, email, password);
+        await setDoc(doc(db, "usuaris", res.user.uid), { email, curs: userCourse });
+        alert("Compte creat correctament!");
+      } else {
+        await signInWithEmailAndPassword(auth, email, password);
+      }
+    } catch (error) {
+      alert("Error d'accés: " + error.message);
+    }
+  };
+
   const toggleCurso = (curso, tipus) => {
     if (tipus === 'aviso') {
       setCursosSeleccionatsAviso(prev => prev.includes(curso) ? prev.filter(c => c !== curso) : [...prev, curso]);
@@ -72,18 +130,36 @@ function App() {
     const targets = cursosSeleccionatsAviso.length > 0 ? cursosSeleccionatsAviso : ["General"];
     for (const curs of targets) {
       await addDoc(collection(db, "avisos"), { text: nouAviso, curs: curs, data: new Date().toLocaleDateString('ca-ES'), createdAt: serverTimestamp() });
+      
+      // Enviem el correu si no és un avís general
+      if (curs !== "General") {
+        enviarEmailsBrevo(curs, nouAviso);
+      }
     }
     setNouAviso(''); setCursosSeleccionatsAviso([]);
-    alert("✅ Avisos enviats!");
+    alert("✅ Avisos enviats i correus en cua!");
   };
 
   const crearMaterialMúltiple = async (e) => {
     e.preventDefault();
+    const temaFinal = temaExistent === "nou" || !temaExistent ? temaMat : temaExistent;
+    if (!temaFinal) { alert("Si us plau, indica un tema."); return; }
+    
     for (const curs of cursosSeleccionatsMat) {
-      await addDoc(collection(db, "materials"), { nom: nomMat, url: urlMat, categoria: curs, createdAt: serverTimestamp() });
+      await addDoc(collection(db, "materials"), { 
+        nom: nomMat, 
+        url: urlMat, 
+        tema: temaFinal, 
+        categoria: curs, 
+        createdAt: serverTimestamp() 
+      });
     }
-    setNomMat(''); setUrlMat(''); setCursosSeleccionatsMat([]);
+    setNomMat(''); setUrlMat(''); setTemaMat(''); setTemaExistent(''); setCursosSeleccionatsMat([]);
     alert("✅ Materials afegits!");
+  };
+
+  const canviarTemaMaterial = async (id, nouTema) => {
+    await updateDoc(doc(db, "materials", id), { tema: nouTema });
   };
 
   const eliminarElement = async (col, id) => {
@@ -99,17 +175,8 @@ function App() {
       <div className="login-container">
         <div className="login-card">
           <img src={logoMates} alt="Logo" style={{ width: '100px', marginBottom: '20px' }} />
-          <h2>Accés Alumnes</h2>
-          <form onSubmit={(e) => {
-            e.preventDefault();
-            if (isRegistering) {
-              createUserWithEmailAndPassword(auth, email, password).then(res => {
-                setDoc(doc(db, "usuaris", res.user.uid), { email, curs: userCourse });
-              });
-            } else {
-              signInWithEmailAndPassword(auth, email, password);
-            }
-          }}>
+          <h2>{isRegistering ? 'Crear Compte' : 'Accés Alumnes'}</h2>
+          <form onSubmit={handleAuth}>
             <input className="login-input" type="email" placeholder="Correu electrònic" onChange={e => setEmail(e.target.value)} required />
             <input className="login-input" type="password" placeholder="Contrasenya" onChange={e => setPassword(e.target.value)} required />
             {isRegistering && (
@@ -130,6 +197,15 @@ function App() {
   const realAdmin = user.email === adminEmail;
   const cursActual = (realAdmin && !modeAdminActiu) ? cursSimulat : userData?.curs;
 
+  const materialsFiltrats = materials.filter(m => m.categoria === cursActual && (m.nom || "").toLowerCase().includes(searchTerm.toLowerCase()));
+  
+  const temesFiltratsPerCheckboxes = [...new Set(
+    materials
+      .filter(m => cursosSeleccionatsMat.includes(m.categoria))
+      .map(m => m.tema)
+      .filter(Boolean)
+  )];
+
   return (
     <div className="app-wrapper">
       <header>
@@ -142,12 +218,12 @@ function App() {
         
         {realAdmin && (
           <div className="admin-selector-view" style={{marginTop: '20px'}}>
-            <select value={modeAdminActiu ? "admin" : "alumne"} onChange={(e) => setModeAdminActiu(e.target.value === "admin")} style={{padding: '10px', borderRadius: '10px'}}>
+            <select className="login-input" style={{padding: '10px', width: 'auto', display: 'inline-block'}} value={modeAdminActiu ? "admin" : "alumne"} onChange={(e) => setModeAdminActiu(e.target.value === "admin")}>
               <option value="admin">🔧 GESTIÓ ADMIN</option>
               <option value="alumne">🎓 VISTA ALUMNE</option>
             </select>
             {!modeAdminActiu && (
-              <select value={cursSimulat} onChange={(e) => setCursSimulat(e.target.value)} style={{marginLeft: '10px', padding: '10px', borderRadius: '10px', borderColor: 'var(--color-logo-verd)'}}>
+              <select className="login-input" style={{marginLeft: '10px', padding: '10px', width: 'auto', display: 'inline-block', borderColor: 'var(--color-logo-verd)'}} value={cursSimulat} onChange={(e) => setCursSimulat(e.target.value)}>
                 {llistaCursos.map(c => <option key={c} value={c}>Curs: {c}</option>)}
               </select>
             )}
@@ -183,6 +259,17 @@ function App() {
                 <form onSubmit={crearMaterialMúltiple}>
                   <input type="text" placeholder="Títol del recurs" value={nomMat} onChange={e => setNomMat(e.target.value)} required />
                   <input type="text" placeholder="Enllaç (URL)" value={urlMat} onChange={e => setUrlMat(e.target.value)} required />
+                  
+                  <select className="login-input" value={temaExistent} onChange={e => setTemaExistent(e.target.value)}>
+                    <option value="">-- Selecciona tema existent --</option>
+                    <option value="nou">+ CREAR NOU TEMA</option>
+                    {temesFiltratsPerCheckboxes.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+
+                  {(temaExistent === "nou" || (cursosSeleccionatsMat.length > 0 && temesFiltratsPerCheckboxes.length === 0)) && (
+                    <input type="text" placeholder="Nom del nou tema" value={temaMat} onChange={e => setTemaMat(e.target.value)} required />
+                  )}
+
                   <div className="multi-select-area">
                     <p>Afegir a:</p>
                     <div className="checkbox-grid">
@@ -201,39 +288,52 @@ function App() {
             <div className="admin-management-section">
               <h3 className="section-title-admin">📦 Gestió de Contingut Penjat</h3>
               <div className="accordion-wrapper">
-                {llistaCursos.map(curs => (
-                  <details key={curs} className="curs-accordion">
-                    <summary className="curs-summary">
-                      <span>{curs}</span>
-                      <div className="count-badges">
-                        <small>📢 {avisos.filter(a => a.curs === curs).length}</small>
-                        <small>📚 {materials.filter(m => m.categoria === curs).length}</small>
+                {llistaCursos.map(curs => {
+                  const temesDaquestCurs = [...new Set(materials.filter(m => m.categoria === curs).map(m => m.tema).filter(Boolean))];
+
+                  return (
+                    <details key={curs} className="curs-accordion">
+                      <summary className="curs-summary">
+                        <span>{curs}</span>
+                        <div className="count-badges">
+                          <small>📢 {avisos.filter(a => a.curs === curs).length}</small>
+                          <small>📚 {materials.filter(m => m.categoria === curs).length}</small>
+                        </div>
+                      </summary>
+                      <div className="curs-content">
+                        <div className="manage-group">
+                          <h4>Avisos</h4>
+                          {avisos.filter(a => a.curs === curs).map(a => (
+                            <div key={a.id} className="manage-item">
+                              <span>{a.text.substring(0, 30)}...</span>
+                              <button onClick={() => eliminarElement('avisos', a.id)} className="btn-delete">Eliminar</button>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="manage-group">
+                          <h4>Materials</h4>
+                          {materials.filter(m => m.categoria === curs).map(m => (
+                            <div key={m.id} className="manage-item" style={{flexDirection: 'column', alignItems: 'flex-start', gap: '10px'}}>
+                              <span>{m.nom}</span>
+                              <div style={{width: '100%', display: 'flex', gap: '5px'}}>
+                                <select 
+                                  className="login-input"
+                                  style={{fontSize: '0.8rem', padding: '8px', flexGrow: 1, marginBottom: '0'}}
+                                  value={m.tema || ""} 
+                                  onChange={(e) => canviarTemaMaterial(m.id, e.target.value)}
+                                >
+                                  <option value="">Sense tema</option>
+                                  {temesDaquestCurs.map(t => <option key={t} value={t}>{t}</option>)}
+                                </select>
+                                <button onClick={() => eliminarElement('materials', m.id)} className="btn-delete" style={{padding: '8px'}}>🗑️</button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    </summary>
-                    <div className="curs-content">
-                      <div className="manage-group">
-                        <h4>Avisos</h4>
-                        {avisos.filter(a => a.curs === curs).length === 0 && <p className="no-data">Cap avís.</p>}
-                        {avisos.filter(a => a.curs === curs).map(a => (
-                          <div key={a.id} className="manage-item">
-                            <span>{a.text.substring(0, 40)}...</span>
-                            <button onClick={() => eliminarElement('avisos', a.id)} className="btn-delete">Eliminar</button>
-                          </div>
-                        ))}
-                      </div>
-                      <div className="manage-group">
-                        <h4>Materials</h4>
-                        {materials.filter(m => m.categoria === curs).length === 0 && <p className="no-data">Cap material.</p>}
-                        {materials.filter(m => m.categoria === curs).map(m => (
-                          <div key={m.id} className="manage-item">
-                            <span>{m.nom}</span>
-                            <button onClick={() => eliminarElement('materials', m.id)} className="btn-delete">Eliminar</button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </details>
-                ))}
+                    </details>
+                  );
+                })}
               </div>
             </div>
           </section>
@@ -247,31 +347,32 @@ function App() {
               </div>
             ))}
 
-            <h2 className="section-title">Materials de {cursActual}</h2>
-            <div className="section-wrapper">
-              {materials
-                .filter(m => m.categoria === cursActual && (m.nom || "").toLowerCase().includes(searchTerm.toLowerCase()))
-                .map(item => (
-                  <div key={item.id} className="course-item" onClick={() => window.open(item.url, '_blank')}>
-                    <div className="icon-box">📄</div>
-                    <div className="info-box">
-                      <h3>{item.nom}</h3>
-                      <p>Prem per descarregar o veure</p>
+            <h2 className="section-title">Treball de classe - {cursActual}</h2>
+            {[...new Set(materialsFiltrats.map(m => m.tema || "Sense tema"))].map(tema => (
+              <div key={tema} style={{marginBottom: '40px'}}>
+                <h3 className="topic-title" style={{fontSize: '1.8rem', color: 'var(--verd-muntanya)', borderBottom: '2px solid var(--verd-lluminos)', paddingBottom: '10px', marginBottom: '20px'}}>{tema}</h3>
+                <div className="section-wrapper">
+                  {materialsFiltrats.filter(m => (m.tema || "Sense tema") === tema).map(item => (
+                    <div key={item.id} className="course-item" onClick={() => window.open(item.url, '_blank')}>
+                      <div className="icon-box">📄</div>
+                      <div className="info-box">
+                        <h3>{item.nom}</h3>
+                        <p>Prem per veure el material</p>
+                      </div>
                     </div>
-                  </div>
-                ))}
-            </div>
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </main>
 
       <footer>
         <div className="footer-links">
-          {/* Enllaç amb el teu logo d'Instagram */}
-          <a href="#" aria-label="Instagram">
+          <a href="https://www.instagram.com/serradequacions/" target="_blank" rel="noreferrer" aria-label="Instagram">
             <img src={logoInstagram} alt="Instagram" style={{ width: '24px', height: '24px' }} />
           </a>
-          {/* Enllaç de correu amb icona */}
           <a href="mailto:serradequacions@gmail.com" aria-label="Correu" style={{ fontSize: '1.5rem' }}>✉️</a>
         </div>
         <p>© 2026 Serra d'Equacions - Tots els drets reservats</p>
