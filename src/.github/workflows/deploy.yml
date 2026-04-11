@@ -1,14 +1,19 @@
 name: Deploy
 on:
   push:
-    branches: [ main ] # S'executa cada vegada que puges canvis a main
+    branches: [ main ]
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4 # Actualitzat a v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4 # Afegim aquest pas per fixar la versió
+        with:
+          node-version: 22 # Una versió estable i moderna
 
       - name: Install and Build
         run: |
@@ -20,5 +25,5 @@ jobs:
       - name: Deploy
         uses: JamesIves/github-pages-deploy-action@v4
         with:
-          folder: dist # La carpeta que crea Vite
-          branch: gh-pages # La branca on GitHub guarda la web
+          folder: dist
+          branch: gh-pages
