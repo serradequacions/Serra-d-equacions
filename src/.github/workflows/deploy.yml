@@ -24,8 +24,6 @@ jobs:
         run: |
           npm ci
           npm run build
-        env:
-          VITE_BREVO_API_KEY: ${{ secrets.VITE_BREVO_API_KEY }}
 
       - name: Deploy
         uses: JamesIves/github-pages-deploy-action@v4
