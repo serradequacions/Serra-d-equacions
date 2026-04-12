@@ -1,13 +1,22 @@
 <!DOCTYPE html>
-<html lang="ca">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/Serra-d-equacions/favicon.ico" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Serra d'Equacions</title>
-    </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
-  </body>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="refresh" content="0;url=/Serra-d-equacions/clear-cache.html">
+  <title>Redirigint...</title>
+</head>
+<body>
+  <script>
+    // Per als que no tinguin JS desactivat, neteja ràpida
+    if ('caches' in window) {
+      caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k))));
+    }
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(regs => {
+        regs.forEach(r => r.unregister());
+      });
+    }
+    window.location.replace('/Serra-d-equacions/clear-cache.html');
+  </script>
+</body>
 </html>
