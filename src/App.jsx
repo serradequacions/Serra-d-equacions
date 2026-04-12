@@ -132,9 +132,9 @@ function App() {
       await addDoc(collection(db, "avisos"), { text: nouAviso, curs: curs, data: new Date().toLocaleDateString('ca-ES'), createdAt: serverTimestamp() });
       
       // Enviem el correu si no és un avís general
-      if (curs !== "General") {
-        enviarEmailsBrevo(curs, nouAviso);
-      }
+      // if (curs !== "General") {
+      //   enviarEmailsBrevo(curs, nouAviso); // TODO: migrar a proxy segur
+      // }
     }
     setNouAviso(''); setCursosSeleccionatsAviso([]);
     alert("✅ Avisos enviats i correus en cua!");
