@@ -1,1 +1,1 @@
-if('serviceWorker' in navigator) {window.addEventListener('load', () => {navigator.serviceWorker.register('/Serra-d-equacions/sw-v2.js', { scope: '/Serra-d-equacions/' })})}
+if('serviceWorker' in navigator) {window.addEventListener('load', () => {navigator.serviceWorker.register('/Serra-d-equacions/sw-final.js', { scope: '/Serra-d-equacions/' })})}
