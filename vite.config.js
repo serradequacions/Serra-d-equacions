@@ -12,6 +12,9 @@ export default defineConfig({
       workbox: {
         skipWaiting: true,
         clientsClaim: true,
+        navigateFallback: null,
+        runtimeCaching: [],
+        globPatterns: ['**/*.{css,html,ico,png,svg}'],
       },
       manifest: {
         name: "Serra d'Equacions",
