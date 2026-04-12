@@ -4,33 +4,27 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  // Ruta base del projecte a GitHub Pages
-  base: '/Serra-d-equacions/app/',
+  // ACTUALITZACIÓ CRÍTICA: Hem tret '/app/' perquè a la branca gh-pages 
+  // els teus fitxers estan directament a l'arrel del repositori.
+  base: '/Serra-d-equacions/', 
   
   plugins: [
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      // Canviem el nom del fitxer per invalidar el Service Worker vell
+      // Mantenim sw-v2.js per forçar la invalidació del SW antic (zombie)
       filename: 'sw-v2.js',
       includeAssets: ['favicon.ico', 'pwa-192x192.png', 'pwa-512x512.png'],
       
       workbox: {
-        // Força l'activació del nou SW sense esperar que l'usuari tanqui pestanyes
         skipWaiting: true,
         clientsClaim: true,
-        
-        // Evitem que el SW intenti gestionar la navegació interna de Vite
         navigateFallback: null,
         
-        // ESTRATÈGIA CRÍTICA:
-        // Només guardem en memòria cau imatges, estils i HTML.
-        // NO guardem els fitxers .js en aquesta llista (globPatterns) 
-        // per assegurar-nos que el navegador sempre demani el JS nou a la xarxa
-        // i així vegi la teva correcció de Cloudflare/Brevo.
+        // Seguim sense posar els .js aquí per evitar que es tornin a bloquejar
+        // a la memòria cau del navegador mentre fem proves.
         globPatterns: ['**/*.{css,html,ico,png,svg}'],
         
-        // Si més endavant vols guardar coses, ho pots fer aquí amb NetworkFirst
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/serradequacions\.github\.io\/.*\.js$/,
@@ -71,7 +65,6 @@ export default defineConfig({
     })
   ],
   
-  // Opcional: Per assegurar-te que el build neteja la carpeta de sortida
   build: {
     emptyOutDir: true,
   }
