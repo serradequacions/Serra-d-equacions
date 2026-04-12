@@ -25,15 +25,16 @@ jobs:
           npm ci
           npm run build
 
+      # MOURE AQUÍ: Copiar fitxers ABANS de fer el Deploy
+      - name: Prepara fitxers extres
+        run: |
+          cp public/sw-kill.js dist/sw-kill.js || true
+          cp public/clear-cache.html dist/clear-cache.html || true
+
       - name: Deploy
         uses: JamesIves/github-pages-deploy-action@v4
         with:
           folder: dist
           branch: gh-pages
           target-folder: app
-
-      - name: Copia fitxers destructor SW
-        run: |
-          cp public/sw-kill.js dist/sw-kill.js
-          cp public/clear-cache.html dist/clear-cache.html
-          
+          clean: false # Evita que GitHub esborri coses de la branca gh-pages que podrien ser útils
