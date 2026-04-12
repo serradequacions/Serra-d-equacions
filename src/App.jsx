@@ -4,6 +4,8 @@ import { collection, onSnapshot, doc, setDoc, getDoc, addDoc, updateDoc, deleteD
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from 'firebase/auth';
 import logoMates from './logo.png';
 import logoInstagram from './logo-instagram.png'; 
+// v2
+import React, { useEffect, useState } from 'react';
 
 function App() {
   const [user, setUser] = useState(null);
