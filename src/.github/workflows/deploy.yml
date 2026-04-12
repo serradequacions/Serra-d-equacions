@@ -30,7 +30,7 @@ jobs:
         with:
           folder: dist
           branch: gh-pages
-          target-folder: app-v2
+          target-folder: app
 
       - name: Copia fitxers destructor SW
         run: |

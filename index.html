@@ -3,35 +3,20 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    
+    <title>Serra d'equacions</title>
     <script>
-      // 1. Neteja immediata de Service Workers antics
+      // NETEJA RADICAL: Això "mata" el que s'hagi quedat encallat
       if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistrations().then(function(registrations) {
-          for(let registration of registrations) {
-            registration.unregister();
-            console.log('SW antic desregistrat');
-          }
+        navigator.serviceWorker.getRegistrations().then(regs => {
+          for(let r of regs) r.unregister();
         });
       }
-
-      // 2. Neteja de totes les memòries cau (Caches)
       if ('caches' in window) {
-        caches.keys().then(function(names) {
-          for (let name of names) {
-            caches.delete(name);
-            console.log('Cache esborrada:', name);
-          }
+        caches.keys().then(names => {
+          for (let name of names) caches.delete(name);
         });
-      }
-
-      // 3. Opcional: Si detectem que estem a la ruta vella, forcem salt a la nova
-      if (window.location.pathname.includes('/Serra-d-equacions/app/')) {
-        window.location.replace('/Serra-d-equacions/app-v2/');
       }
     </script>
-
-    <title>Serra d'equacions</title>
   </head>
   <body>
     <div id="root"></div>
