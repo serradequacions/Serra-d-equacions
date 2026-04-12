@@ -4,7 +4,7 @@ import { getAuth } from "firebase/auth";
 
 const firebaseConfig = {
   // Ara utilitzem la variable d'entorn en lloc d'escriure la clau directament
-  apiKey: import.meta.env.VITE_FIREBASE_KEY, 
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY, 
   authDomain: "app-mates.firebaseapp.com",
   projectId: "app-mates",
   storageBucket: "app-mates.firebasestorage.app",
