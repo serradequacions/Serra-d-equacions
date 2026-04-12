@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
-  base: '/Serra-d-equacions/app/',
+  base: '/Serra-d-equacions/app-v2/',
   plugins: [
     react(),
     VitePWA({

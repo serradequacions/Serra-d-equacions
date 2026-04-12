@@ -30,18 +30,10 @@ jobs:
         with:
           folder: dist
           branch: gh-pages
-          target-folder: app
+          target-folder: app-v2
 
       - name: Copia fitxers destructor SW
         run: |
           cp public/sw-kill.js dist/sw-kill.js
           cp public/clear-cache.html dist/clear-cache.html
-          cat > dist/index.html << 'EOF'
-           <!DOCTYPE html><html><head>
-          <meta charset="UTF-8">
-          <script>
-          if('caches'in window)caches.keys().then(k=>Promise.all(k.map(c=>caches.delete(c))));
-          if('serviceWorker'in navigator)navigator.serviceWorker.getRegistrations().then(r=>r.forEach(x=>x.unregister()));
-          window.location.replace('/Serra-d-equacions/clear-cache.html');
-          </script></head><body></body></html>
-          EOF
+          
