@@ -61,7 +61,7 @@ function App() {
     }
   }, [user]);
 
-  // --- NOVA FUNCIÓ PER ENVIAR EMAILS ---
+  // --- FUNCIÓ PER ENVIAR EMAILS VIA CLOUDFLARE WORKER ---
   const enviarEmailsBrevo = async (cursSeleccionat, textAviso) => {
     const usuarisRef = collection(db, "usuaris");
     const querySnapshot = await getDocs(usuarisRef);
@@ -73,34 +73,20 @@ function App() {
     if (destinataris.length === 0) return;
 
     try {
-      await fetch('https://api.brevo.com/v3/smtp/email', {
+      await fetch('https://brevo-proxy.serradequacions.workers.dev', {
         method: 'POST',
-        headers: {
-          'accept': 'application/json',
-          'api-key': import.meta.env.VITE_BREVO_API_KEY, // RECORDA CANVIAR AIXÒ
-          'content-type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          sender: { name: "Serra d'Equacions", email: "serradequacions@gmail.com" },
-          to: destinataris,
-          subject: `Nou avís de Matemàtiques - ${cursSeleccionat}`,
-          htmlContent: `
-            <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #eee;">
-              <h2 style="color: #27ae60;">Nou avís publicat</h2>
-              <p>Hola! S'ha publicat un nou avís per al curs <strong>${cursSeleccionat}</strong>:</p>
-              <blockquote style="background: #f9f9f9; padding: 15px; border-left: 5px solid #27ae60;">
-                ${textAviso}
-              </blockquote>
-              <p>Pots consultar tota la informació a la web:</p>
-              <a href="https://serradequacions.github.io" style="display: inline-block; padding: 10px 20px; background-color: #27ae60; color: white; text-decoration: none; border-radius: 5px;">Anar a Serra d'Equacions</a>
-            </div>`
+          destinataris,
+          curs: cursSeleccionat,
+          text: textAviso,
         })
       });
     } catch (error) {
       console.error("Error enviant correus:", error);
     }
   };
-  // -------------------------------------
+  // ------------------------------------------------------
 
   const handleAuth = async (e) => {
     e.preventDefault();
@@ -132,9 +118,9 @@ function App() {
       await addDoc(collection(db, "avisos"), { text: nouAviso, curs: curs, data: new Date().toLocaleDateString('ca-ES'), createdAt: serverTimestamp() });
       
       // Enviem el correu si no és un avís general
-      // if (curs !== "General") {
-      //   enviarEmailsBrevo(curs, nouAviso); // TODO: migrar a proxy segur
-      // }
+      if (curs !== "General") {
+        enviarEmailsBrevo(curs, nouAviso);
+      }
     }
     setNouAviso(''); setCursosSeleccionatsAviso([]);
     alert("✅ Avisos enviats i correus en cua!");
