@@ -4,13 +4,18 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Serra d'equacions</title>
+    
     <script>
-      // NETEJA RADICAL: Això "mata" el que s'hagi quedat encallat
+      // AQUEST ÉS EL "BOTÓ DEL PÀNIC"
+      // Si el navegador troba un Service Worker, el desregistra immediatament
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.getRegistrations().then(regs => {
-          for(let r of regs) r.unregister();
+          for(let r of regs) {
+            r.unregister().then(() => console.log('SW eliminat amb èxit'));
+          }
         });
       }
+      // Esborra les carpetes de caché on viu el fitxer vell
       if ('caches' in window) {
         caches.keys().then(names => {
           for (let name of names) caches.delete(name);
