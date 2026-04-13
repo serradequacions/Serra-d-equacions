@@ -2,30 +2,15 @@
 <html lang="ca">
   <head>
     <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" href="/Serra-d-equacions/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#8fb382" />
     <title>Serra d'equacions</title>
     
-    <script>
-      // AQUEST ÉS EL "BOTÓ DEL PÀNIC"
-      // Si el navegador troba un Service Worker, el desregistra immediatament
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistrations().then(regs => {
-          for(let r of regs) {
-            r.unregister().then(() => console.log('SW eliminat amb èxit'));
-          }
-        });
-      }
-      // Esborra les carpetes de caché on viu el fitxer vell
-      if ('caches' in window) {
-        caches.keys().then(names => {
-          for (let name of names) caches.delete(name);
-        });
-      }
-    </script>
-    <script type="module" crossorigin src="/Serra-d-equacions/assets/index-0bA0fYM3.js"></script>
-    <link rel="stylesheet" crossorigin href="/Serra-d-equacions/assets/index-SFfIYcQJ.css">
-  <link rel="manifest" href="/Serra-d-equacions/manifest.webmanifest"><script id="vite-plugin-pwa:inline-sw">if('serviceWorker' in navigator) {window.addEventListener('load', () => {navigator.serviceWorker.register('/Serra-d-equacions/sw.js', { scope: '/Serra-d-equacions/' })})}</script></head>
+      <script type="module" crossorigin src="/Serra-d-equacions/assets/index-BFgvaxch.js"></script>
+      <link rel="stylesheet" crossorigin href="/Serra-d-equacions/assets/index-SFfIYcQJ.css">
+    <link rel="manifest" href="/Serra-d-equacions/manifest.webmanifest"><script id="vite-plugin-pwa:inline-sw">if('serviceWorker' in navigator) {window.addEventListener('load', () => {navigator.serviceWorker.register('/Serra-d-equacions/sw.js', { scope: '/Serra-d-equacions/' })})}</script></head>
   <body>
-    <div id="root"></div>
+    <div id="root"></div>
   </body>
 </html>
