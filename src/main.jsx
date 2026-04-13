@@ -3,36 +3,28 @@ import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
 import './index.css'
 
-// 🔥 Neteja suau (no crítica, però útil si arriba a executar-se)
+// 1. Neteja agressiva de SW antics (Per si el navegador encara té la ruta /app-v2/ guardada)
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.getRegistrations().then(registrations => {
-    registrations.forEach(registration => registration.unregister())
-  })
+  navigator.serviceWorker.getRegistrations().then((registrations) => {
+    for (const reg of registrations) {
+      // Opcional: Podem desregistrar-los tots per assegurar una instal·lació neta
+      reg.unregister();
+    }
+  });
 
   if ('caches' in window) {
-    caches.keys().then(keys => keys.forEach(key => caches.delete(key)))
+    caches.keys().then((keys) => {
+      keys.forEach((key) => caches.delete(key));
+    });
   }
 }
 
-// 🚀 Render app
+// 2. Render de l'aplicació
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <App />
   </React.StrictMode>
-)
+);
 
-// ✅ Registrar NOU Service Worker amb scope correcte
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register(
-      '/Serra-d-equacions/app-v2/sw.js',
-      { scope: '/Serra-d-equacions/app-v2/' }
-    )
-    .then(reg => {
-      console.log('✅ SW registrat:', reg.scope)
-    })
-    .catch(err => {
-      console.error('❌ Error registrant SW:', err)
-    })
-  })
-}
+// NOTA: No cal fer cap import de 'virtual:pwa-register' ni res similar 
+// perquè hem posat 'injectRegister: inline' al vite.config.js.

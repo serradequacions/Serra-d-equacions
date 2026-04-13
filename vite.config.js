@@ -2,45 +2,16 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
-// https://vitejs.dev/config/
 export default defineConfig({
-  // ACTUALITZACIÓ CRÍTICA: Ruta base per a l'arrel de GitHub Pages
-  // Això fa que l'HTML trobi correctament els fitxers a /Serra-d-equacions/
+  // Ruta base correcta per a GitHub Pages
   base: '/Serra-d-equacions/', 
-  
+
   plugins: [
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      // Cambiem el nom a sw-final.js per forçar el navegador a oblidar rutes velles com 'app-v2'
-      filename: 'sw-final.js',
+      injectRegister: 'inline', // Injecta el registre directament a l'index.html
       includeAssets: ['favicon.ico', 'pwa-192x192.png', 'pwa-512x512.png'],
-      
-      workbox: {
-        // Força l'activació immediata del nou Service Worker
-        skipWaiting: true,
-        clientsClaim: true,
-        
-        // Evitem que el SW intenti gestionar la navegació interna de Vite durant les proves
-        navigateFallback: null,
-        
-        // ESTRATÈGIA DE CACHÉ:
-        // Només guardem imatges, estils i HTML per evitar bloquejar el JS nou
-        globPatterns: ['**/*.{css,html,ico,png,svg}'],
-        
-        // Assegurem que el destí del fitxer sigui l'arrel del build
-        swDest: 'sw-final.js',
-        
-        runtimeCaching: [
-          {
-            urlPattern: /^https:\/\/serradequacions\.github\.io\/.*\.js$/,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'js-scripts',
-            }
-          }
-        ],
-      },
       
       manifest: {
         name: "Serra d'Equacions",
@@ -67,12 +38,20 @@ export default defineConfig({
             purpose: 'any maskable'
           }
         ]
+      },
+
+      workbox: {
+        // Netegem la configuració manual per evitar errors de rutes
+        globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
+        cleanupOutdatedCaches: true,
+        clientsClaim: true,
+        skipWaiting: true,
+        // Ja no necessitem runtimeCaching complex si el base està ben posat
       }
     })
   ],
-  
-  // Neteja la carpeta de sortida abans de cada build
+
   build: {
-    emptyOutDir: true,
+    emptyOutDir: true, // Força la neteja de la carpeta dist a cada build
   }
 })
