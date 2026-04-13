@@ -11,7 +11,7 @@ import logoMates from './logo.png';
 import logoInstagram from './logo-instagram.png'; 
 
 function App() {
-  // --- ESTATS GENERALS ---
+  // --- ESTATS DE L'USUARI I APP ---
   const [user, setUser] = useState(null);
   const [userData, setUserData] = useState(null);
   const [isRegistering, setIsRegistering] = useState(false);
@@ -25,7 +25,7 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
 
-  // --- ESTATS ADMIN ---
+  // --- ESTATS DE L'ADMINISTRADOR ---
   const [modeAdminActiu, setModeAdminActiu] = useState(true); 
   const [cursSimulat, setCursSimulat] = useState('1r ESO');
   const [nouAviso, setNouAviso] = useState('');
@@ -38,7 +38,12 @@ function App() {
   const [cursosSeleccionatsMat, setCursosSeleccionatsMat] = useState([]);
 
   const adminEmail = "serradequacions@gmail.com"; 
-  const llistaCursos = ["1r ESO", "2n ESO", "3r ESO", "4t ESO A", "4t ESO B", "1r BATX CCSS", "1r BATX CIEN.", "1r BATX GENERAL", "2n BATX CCSS", "2n BATX CIEN"];
+  const llistaCursos = [
+    "1r ESO", "2n ESO", "3r ESO", "4t ESO A", "4t ESO B", 
+    "1r BATX CCSS", "1r BATX CIEN.", "1r BATX GENERAL", 
+    "2n BATX CCSS", "2n BATX CIEN"
+  ];
+
   const iconesTipus = { 'Teoria': '📚', 'Exercici': '📝', 'Vídeo': '🎥', 'Examen': '🏁' };
 
   // --- 1. CONTROL DE SESSIÓ ---
@@ -56,17 +61,22 @@ function App() {
         }
       } else {
         setUser(null);
+        setUserData(null);
       }
       setLoading(false);
     });
     return () => unsubscribe();
   }, []);
 
-  // --- 2. SUBSCRIPCIÓ A DADES (SNAPSHOTS) ---
+  // --- 2. SUBSCRIPCIÓ A DADES EN TEMPS REAL ---
   useEffect(() => {
     if (user) {
-      const unsubMat = onSnapshot(collection(db, 'materials'), (snap) => setMaterials(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-      const unsubAvi = onSnapshot(collection(db, 'avisos'), (snap) => setAvisos(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+      const unsubMat = onSnapshot(collection(db, 'materials'), (snap) => {
+        setMaterials(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      });
+      const unsubAvi = onSnapshot(collection(db, 'avisos'), (snap) => {
+        setAvisos(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      });
       const unsubEnt = onSnapshot(collection(db, 'entregues'), (snap) => {
         const dades = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         setEntregues(user.email === adminEmail ? dades : dades.filter(e => e.alumneEmail === user.email));
@@ -91,20 +101,23 @@ function App() {
           body: JSON.stringify({ destinataris, curs, text })
         });
       }
-    } catch (err) { console.error("Error enviant mails:", err); }
+    } catch (err) { console.error("Error Brevo:", err); }
   };
 
-  // --- 4. FUNCIONS D'ENTREGUES (STORAGE) ---
+  // --- 4. FUNCIONS D'ALUMNE (ENTREGUES STORAGE) ---
   const pujarTasca = async (e, materialId, materialNom) => {
     const fitxer = e.target.files[0];
     if (!fitxer) return;
+
     setUploading(true);
     try {
       const storageRef = ref(storage, `entregues/${user.uid}_${materialId}_${fitxer.name}`);
       await uploadBytes(storageRef, fitxer);
       const downloadURL = await getDownloadURL(storageRef);
+
       await addDoc(collection(db, "entregues"), {
-        materialId, materialNom,
+        materialId,
+        materialNom,
         alumneEmail: user.email,
         alumneNom: user.displayName || user.email,
         curs: userData.curs,
@@ -112,73 +125,87 @@ function App() {
         dataEntrega: new Date().toLocaleString('ca-ES'),
         createdAt: serverTimestamp()
       });
-      alert("✅ Tasca entregada!");
-    } catch (error) { alert("Error: " + error.message); }
-    finally { setUploading(false); }
+      alert("✅ Tasca entregada correctament!");
+    } catch (error) {
+      alert("Error en la pujada: " + error.message);
+    } finally {
+      setUploading(false);
+    }
   };
 
-  // --- 5. LÒGICA ADMIN ---
+  // --- 5. FUNCIONS D'ADMINISTRACIÓ ---
   const crearMaterialMúltiple = async (e) => {
     e.preventDefault();
     const temaFinal = temaExistent === "nou" || !temaExistent ? temaMat : temaExistent;
-    if (!temaFinal) return alert("Posa un tema!");
+    if (!temaFinal) return alert("Defineix un tema!");
+
     for (const curs of cursosSeleccionatsMat) {
       await addDoc(collection(db, "materials"), { 
         nom: nomMat, url: urlMat, tema: temaFinal, categoria: curs, tipus: tipusMat, createdAt: serverTimestamp() 
       });
-      enviarEmailsBrevo(curs, `Nou material penjat: ${nomMat}`);
+      enviarEmailsBrevo(curs, `Nou material: ${nomMat}`);
     }
     setNomMat(''); setUrlMat(''); setTemaMat(''); setTemaExistent(''); setCursosSeleccionatsMat([]);
-    alert("🚀 Material creat i mails enviats!");
+    alert("🚀 Material publicat i correus enviats!");
   };
 
   const publicarAvisoMúltiple = async (e) => {
     e.preventDefault();
     const targets = cursosSeleccionatsAviso.length > 0 ? cursosSeleccionatsAviso : ["General"];
     for (const curs of targets) {
-      await addDoc(collection(db, "avisos"), { text: nouAviso, curs: curs, data: new Date().toLocaleDateString('ca-ES'), createdAt: serverTimestamp() });
+      await addDoc(collection(db, "avisos"), { 
+        text: nouAviso, curs, data: new Date().toLocaleDateString('ca-ES'), createdAt: serverTimestamp() 
+      });
       if (curs !== "General") enviarEmailsBrevo(curs, nouAviso);
     }
     setNouAviso(''); setCursosSeleccionatsAviso([]);
-    alert("📢 Avís publicat!");
+    alert("📢 Avisos enviats!");
   };
 
   const eliminarElement = async (col, id) => {
-    if (window.confirm("Segur que ho vols eliminar?")) await deleteDoc(doc(db, col, id));
+    if (window.confirm("Vols eliminar-ho definitivament?")) {
+      await deleteDoc(doc(db, col, id));
+    }
   };
 
-  // --- 6. RENDERITZAT ---
+  // --- 6. AUTENTICACIÓ ---
+  const handleAuth = async (e) => {
+    e.preventDefault();
+    try {
+      if (isRegistering) {
+        const res = await createUserWithEmailAndPassword(auth, email, password);
+        await setDoc(doc(db, "usuaris", res.user.uid), { email, curs: userCourse });
+      } else {
+        await signInWithEmailAndPassword(auth, email, password);
+      }
+    } catch (err) { alert(err.message); }
+  };
+
   if (loading) return <div className="loader-container"><h2>Carregant Serra d'Equacions...</h2></div>;
 
+  // --- VISTA LOGIN ---
   if (!user) {
     return (
       <div className="login-container">
         <div className="login-card">
           <img src={logoMates} alt="Logo" style={{ width: '100px', marginBottom: '20px' }} />
-          <h2>{isRegistering ? 'Registre' : 'Accés'}</h2>
-          <button onClick={() => signInWithPopup(auth, new GoogleAuthProvider())} className="login-button" style={{background: '#fff', color: '#444', border: '1px solid #ddd', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginBottom: '15px'}}>
-            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="G" style={{width: '18px'}} /> Entra amb Google
+          <h2>{isRegistering ? 'Registre Nou Usuari' : 'Inici de Sessió'}</h2>
+          <button onClick={() => signInWithPopup(auth, new GoogleAuthProvider())} className="login-button google-auth">
+            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="" /> Entra amb Google
           </button>
-          <form onSubmit={async (e) => {
-            e.preventDefault();
-            try {
-              if (isRegistering) {
-                const res = await createUserWithEmailAndPassword(auth, email, password);
-                await setDoc(doc(db, "usuaris", res.user.uid), { email, curs: userCourse });
-              } else { await signInWithEmailAndPassword(auth, email, password); }
-            } catch (err) { alert(err.message); }
-          }}>
-            <input className="login-input" type="email" placeholder="Correu" onChange={e => setEmail(e.target.value)} required />
+          <div className="separator">o amb el teu correu</div>
+          <form onSubmit={handleAuth}>
+            <input className="login-input" type="email" placeholder="Correu electrònic" onChange={e => setEmail(e.target.value)} required />
             <input className="login-input" type="password" placeholder="Contrasenya" onChange={e => setPassword(e.target.value)} required />
             {isRegistering && (
               <select className="login-input" value={userCourse} onChange={e => setUserCourse(e.target.value)}>
                 {llistaCursos.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             )}
-            <button className="login-button" type="submit">{isRegistering ? 'REGISTRAR' : 'ENTRAR'}</button>
+            <button className="login-button" type="submit">{isRegistering ? 'CREAR COMPTE' : 'ENTRAR'}</button>
           </form>
-          <p onClick={() => setIsRegistering(!isRegistering)} style={{marginTop: '20px', cursor: 'pointer', color: 'var(--color-logo-blau)'}}>
-            {isRegistering ? 'Ja tens compte? Entra' : 'Nou alumne? Registra\'t'}
+          <p onClick={() => setIsRegistering(!isRegistering)} className="toggle-auth-text">
+            {isRegistering ? 'Ja tens compte? Entra' : 'Ets nou? Registra\'t aquí'}
           </p>
         </div>
       </div>
@@ -192,48 +219,66 @@ function App() {
 
   return (
     <div className="app-wrapper">
-      <header>
-        <div className="top-bar">
-          <div className="notif-bell">🔔</div>
-          <button className="logout-btn" onClick={() => signOut(auth)}>Sortir</button>
+      <header className="main-header">
+        <div className="top-nav">
+          <div className="logo-section">
+            <img src={logoMates} alt="Logo" className="header-logo" />
+            <div>
+              <h1>Serra d'Equacions</h1>
+              <p className="user-badge">{user.email} | {userData?.curs || 'Admin'}</p>
+            </div>
+          </div>
+          <button className="logout-btn" onClick={() => signOut(auth)}>Tancar Sessió</button>
         </div>
-        <img src={logoMates} alt="Logo" style={{ width: '80px' }} />
-        <h1>Serra d'Equacions</h1>
         
         {realAdmin && (
-          <div className="admin-selector-area">
-            <select className="login-input" value={modeAdminActiu ? "admin" : "alumne"} onChange={(e) => setModeAdminActiu(e.target.value === "admin")}>
-              <option value="admin">🔧 MODE GESTIÓ</option>
+          <div className="admin-quick-nav">
+            <select className="mode-toggle" value={modeAdminActiu ? "admin" : "alumne"} onChange={(e) => setModeAdminActiu(e.target.value === "admin")}>
+              <option value="admin">🔧 PANEL DE GESTIÓ</option>
               <option value="alumne">🎓 VISTA ALUMNE</option>
             </select>
             {!modeAdminActiu && (
-              <select className="login-input" value={cursSimulat} onChange={(e) => setCursSimulat(e.target.value)}>
-                {llistaCursos.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
+              <div className="simulator-box">
+                <span>Simulant curs:</span>
+                <select value={cursSimulat} onChange={e => setCursSimulat(e.target.value)}>
+                  {llistaCursos.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
             )}
           </div>
         )}
-        <input className="search-bar" type="text" placeholder="🔍 Cerca recursos..." onChange={e => setSearchTerm(e.target.value)} />
+        <div className="search-container">
+          <input className="search-bar" type="text" placeholder="🔍 Cerca temes, exercicis, vídeos..." onChange={e => setSearchTerm(e.target.value)} />
+        </div>
       </header>
 
-      <main>
+      <main className="content-area">
         {realAdmin && modeAdminActiu ? (
-          <section className="admin-panel">
-            {/* 📥 TAULA ENTREGUES */}
-            <div className="admin-box full-width" style={{background: '#f0f9ff'}}>
-              <h3>📥 Entregues recents</h3>
-              <div className="table-container">
-                <table style={{width: '100%', fontSize: '0.85rem'}}>
+          <section className="admin-dashboard">
+            {/* TAULA D'ENTREGUES (IMPORTANT!) */}
+            <div className="dashboard-card full-width">
+              <div className="card-header">
+                <h3>📥 Bústia d'Entregues (PDFs Alumnes)</h3>
+              </div>
+              <div className="table-wrapper">
+                <table className="admin-table">
                   <thead>
-                    <tr style={{textAlign: 'left', borderBottom: '1px solid #ccc'}}>
-                      <th>Alumne</th><th>Curs</th><th>Tasca</th><th>Data</th><th>Acció</th>
+                    <tr>
+                      <th>Data</th>
+                      <th>Alumne</th>
+                      <th>Curs</th>
+                      <th>Activitat</th>
+                      <th>Fitxer</th>
                     </tr>
                   </thead>
                   <tbody>
                     {entregues.sort((a,b) => b.createdAt - a.createdAt).map(en => (
-                      <tr key={en.id} style={{borderBottom: '1px solid #eee'}}>
-                        <td>{en.alumneEmail}</td><td>{en.curs}</td><td>{en.materialNom}</td><td>{en.dataEntrega}</td>
-                        <td><a href={en.fitxerUrl} target="_blank" rel="noreferrer">👁️ Veure</a></td>
+                      <tr key={en.id}>
+                        <td>{en.dataEntrega}</td>
+                        <td className="bold">{en.alumneEmail}</td>
+                        <td><span className="badge-curs">{en.curs}</span></td>
+                        <td>{en.materialNom}</td>
+                        <td><a href={en.fitxerUrl} target="_blank" rel="noreferrer" className="view-link">Obrir PDF</a></td>
                       </tr>
                     ))}
                   </tbody>
@@ -241,103 +286,169 @@ function App() {
               </div>
             </div>
 
-            <div className="admin-grid">
-              {/* 📢 NOU AVÍS */}
-              <div className="admin-box">
-                <h3>📢 Nou Avís</h3>
-                <textarea value={nouAviso} onChange={e => setNouAviso(e.target.value)} placeholder="Missatge..." />
-                <div className="checkbox-grid">
-                  {llistaCursos.map(c => <label key={c}><input type="checkbox" checked={cursosSeleccionatsAviso.includes(c)} onChange={() => setCursosSeleccionatsAviso(prev => prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c])} /> {c}</label>)}
+            <div className="dashboard-grid">
+              {/* FORMULARI AVISOS */}
+              <div className="dashboard-card">
+                <h3>📢 Publicar Avís</h3>
+                <textarea className="admin-input" value={nouAviso} onChange={e => setNouAviso(e.target.value)} placeholder="Escriu aquí el missatge per als alumnes..." />
+                <p className="small-label">Enviar a:</p>
+                <div className="checkbox-selector">
+                  {llistaCursos.map(c => (
+                    <label key={c} className="check-item">
+                      <input type="checkbox" checked={cursosSeleccionatsAviso.includes(c)} onChange={() => {
+                        setCursosSeleccionatsAviso(prev => prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c]);
+                      }} /> {c}
+                    </label>
+                  ))}
                 </div>
-                <button onClick={publicarAvisoMúltiple} className="btn-admin">PUBLICAR</button>
+                <button onClick={publicarAvisoMúltiple} className="btn-primary">ENVIAR AVÍS</button>
               </div>
 
-              {/* 📚 NOU MATERIAL */}
-              <div className="admin-box">
-                <h3>📚 Nou Material</h3>
-                <form onSubmit={crearMaterialMúltiple}>
-                  <input type="text" placeholder="Títol" value={nomMat} onChange={e => setNomMat(e.target.value)} required />
-                  <input type="text" placeholder="URL" value={urlMat} onChange={e => setUrlMat(e.target.value)} required />
-                  <select className="login-input" value={tipusMat} onChange={e => setTipusMat(e.target.value)}>
-                    {Object.keys(iconesTipus).map(t => <option key={t} value={t}>{t}</option>)}
-                  </select>
-                  <select className="login-input" value={temaExistent} onChange={e => setTemaExistent(e.target.value)}>
-                    <option value="">-- Tema existent --</option>
-                    <option value="nou">+ NOU TEMA</option>
-                    {temesExistents.map(t => <option key={t} value={t}>{t}</option>)}
-                  </select>
-                  {temaExistent === "nou" && <input type="text" placeholder="Nom del tema" value={temaMat} onChange={e => setTemaMat(e.target.value)} required />}
-                  <div className="checkbox-grid">
-                    {llistaCursos.map(c => <label key={c}><input type="checkbox" checked={cursosSeleccionatsMat.includes(c)} onChange={() => setCursosSeleccionatsMat(prev => prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c])} /> {c}</label>)}
+              {/* FORMULARI MATERIAL */}
+              <div className="dashboard-card">
+                <h3>📚 Penjar Nou Material</h3>
+                <form onSubmit={crearMaterialMúltiple} className="admin-form">
+                  <input type="text" placeholder="Títol del recurs" value={nomMat} onChange={e => setNomMat(e.target.value)} required />
+                  <input type="text" placeholder="Enllaç (Drive/Web)" value={urlMat} onChange={e => setUrlMat(e.target.value)} required />
+                  
+                  <div className="form-row">
+                    <select value={tipusMat} onChange={e => setTipusMat(e.target.value)}>
+                      {Object.keys(iconesTipus).map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                    
+                    <select value={temaExistent} onChange={e => setTemaExistent(e.target.value)}>
+                      <option value="">-- Tria tema --</option>
+                      <option value="nou">+ CREAR NOU</option>
+                      {temesExistents.map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
                   </div>
-                  <button type="submit" className="btn-admin btn-green">GUARDAR</button>
+
+                  {(temaExistent === "nou" || temesExistents.length === 0) && (
+                    <input type="text" placeholder="Nom del nou tema" value={temaMat} onChange={e => setTemaMat(e.target.value)} required />
+                  )}
+
+                  <p className="small-label">Cursos destinataris:</p>
+                  <div className="checkbox-selector">
+                    {llistaCursos.map(c => (
+                      <label key={c} className="check-item">
+                        <input type="checkbox" checked={cursosSeleccionatsMat.includes(c)} onChange={() => {
+                          setCursosSeleccionatsMat(prev => prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c]);
+                        }} /> {c}
+                      </label>
+                    ))}
+                  </div>
+                  <button type="submit" className="btn-primary btn-success">PUBLICAR RECURS</button>
                 </form>
               </div>
             </div>
 
-            {/* 📦 GESTIÓ D'ACORDIONS */}
-            <div className="admin-management">
-              <h3>📦 Gestió per cursos</h3>
-              {llistaCursos.map(curs => (
-                <details key={curs} className="curs-accordion">
-                  <summary>{curs} ({materials.filter(m => m.categoria === curs).length} items)</summary>
-                  <div className="manage-list">
-                    {materials.filter(m => m.categoria === curs).map(m => (
-                      <div key={m.id} className="manage-item">
-                        <span>{iconesTipus[m.tipus]} {m.nom}</span>
-                        <button onClick={() => eliminarElement('materials', m.id)} className="btn-delete">🗑️</button>
-                      </div>
-                    ))}
-                  </div>
-                </details>
-              ))}
+            {/* GESTIÓ D'INVENTARI (ACORDIONS) */}
+            <div className="dashboard-card full-width">
+              <h3>📦 Inventari de continguts</h3>
+              <div className="accordion-container">
+                {llistaCursos.map(curs => (
+                  <details key={curs} className="admin-accordion">
+                    <summary>
+                      <strong>{curs}</strong> 
+                      <span>({materials.filter(m => m.categoria === curs).length} fitxers)</span>
+                    </summary>
+                    <div className="accordion-content">
+                      {materials.filter(m => m.categoria === curs).map(m => (
+                        <div key={m.id} className="manage-row">
+                          <span>{iconesTipus[m.tipus]} <strong>{m.nom}</strong> <small>({m.tema})</small></span>
+                          <button onClick={() => eliminarElement('materials', m.id)} className="btn-mini-delete">Eliminar</button>
+                        </div>
+                      ))}
+                      {avisos.filter(a => a.curs === curs).map(a => (
+                        <div key={a.id} className="manage-row aviso-row">
+                          <span>📢 {a.text.substring(0, 40)}...</span>
+                          <button onClick={() => eliminarElement('avisos', a.id)} className="btn-mini-delete">Eliminar</button>
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                ))}
+              </div>
             </div>
           </section>
         ) : (
           /* --- VISTA ALUMNE --- */
-          <div className="student-view">
-            <h2 className="section-title">Avisos recents</h2>
-            {avisos.filter(a => a.curs === cursActual || a.curs === "General").map(a => (
-              <div key={a.id} className="aviso-card"><p>{a.text}</p><small>{a.data}</small></div>
-            ))}
+          <div className="student-layout">
+            <section className="avisos-section">
+              <h2 className="section-title">📢 Avisos de classe</h2>
+              <div className="avisos-grid">
+                {avisos.filter(a => a.curs === cursActual || a.curs === "General").length === 0 ? 
+                  <p className="no-data">No hi ha avisos recents per a {cursActual}.</p> :
+                  avisos.filter(a => a.curs === cursActual || a.curs === "General").map(a => (
+                    <div key={a.id} className="aviso-card">
+                      <div className="aviso-header">
+                        <span className="aviso-tag">{a.curs}</span>
+                        <span className="aviso-date">{a.data}</span>
+                      </div>
+                      <p>{a.text}</p>
+                    </div>
+                  ))
+                }
+              </div>
+            </section>
 
-            <h2 className="section-title">Material de {cursActual}</h2>
-            {[...new Set(materialsFiltrats.map(m => m.tema || "Altres"))].map(tema => (
-              <div key={tema} style={{marginBottom: '30px'}}>
-                <h3 className="topic-title">{tema}</h3>
-                <div className="section-wrapper">
-                  {materialsFiltrats.filter(m => (m.tema || "Altres") === tema).map(item => {
-                    const jaEntregat = entregues.find(e => e.materialId === item.id);
-                    return (
-                      <div key={item.id} className="course-item">
-                        <div className="icon-box" onClick={() => window.open(item.url, '_blank')}>{iconesTipus[item.tipus]}</div>
-                        <div className="info-box">
-                          <h3 onClick={() => window.open(item.url, '_blank')}>{item.nom}</h3>
+            <section className="materials-section">
+              <h2 className="section-title">📚 Recursos de {cursActual}</h2>
+              {[...new Set(materialsFiltrats.map(m => m.tema || "General"))].sort().map(tema => (
+                <div key={tema} className="topic-group">
+                  <h3 className="topic-header">{tema}</h3>
+                  <div className="materials-list">
+                    {materialsFiltrats.filter(m => (m.tema || "General") === tema).map(item => {
+                      const entregaFeta = entregues.find(e => e.materialId === item.id);
+                      return (
+                        <div key={item.id} className="material-card">
+                          <div className="material-main" onClick={() => window.open(item.url, '_blank')}>
+                            <div className="type-icon">{iconesTipus[item.tipus]}</div>
+                            <div className="material-info">
+                              <h4>{item.nom}</h4>
+                              <p>{item.tipus}</p>
+                            </div>
+                          </div>
+                          
+                          {/* ZONA D'ENTREGA PER A EXERCICIS I EXAMENS */}
                           {(item.tipus === 'Exercici' || item.tipus === 'Examen') && (
-                            <div className="upload-zone">
-                              {jaEntregat ? (
-                                <span style={{color: 'green', fontWeight: 'bold'}}>✅ Entregat</span>
+                            <div className="delivery-box">
+                              {entregaFeta ? (
+                                <div className="delivery-status ok">
+                                  <span>✅ Entregat</span>
+                                  <small>{entregaFeta.dataEntrega}</small>
+                                </div>
                               ) : (
-                                <label className="upload-btn-label">
-                                  {uploading ? '...' : '📤 Enviar PDF'}
-                                  <input type="file" style={{display: 'none'}} onChange={(e) => pujarTasca(e, item.id, item.nom)} disabled={uploading} />
+                                <label className="upload-trigger">
+                                  {uploading ? 'Pujant...' : '📤 Enviar la meva feina'}
+                                  <input type="file" onChange={(e) => pujarTasca(e, item.id, item.nom)} disabled={uploading} style={{display: 'none'}} />
                                 </label>
                               )}
                             </div>
                           )}
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </section>
           </div>
         )}
       </main>
-      <footer style={{textAlign: 'center', padding: '20px'}}>
-        <a href="https://www.instagram.com/serradequacions/" target="_blank" rel="noreferrer"><img src={logoInstagram} alt="IG" style={{width: '25px'}} /></a>
-        <p>© 2026 Serra d'Equacions</p>
+
+      <footer className="main-footer">
+        <div className="footer-content">
+          <div className="footer-links">
+            <a href="https://www.instagram.com/serradequacions/" target="_blank" rel="noreferrer" className="ig-link">
+              <img src={logoInstagram} alt="Instagram" /> @serradequacions
+            </a>
+            <a href="mailto:serradequacions@gmail.com" className="mail-link">✉️ Contacte</a>
+          </div>
+          <div className="footer-info">
+            <p>© 2026 Serra d'Equacions | Matemàtiques per a tothom</p>
+          </div>
+        </div>
       </footer>
     </div>
   );
