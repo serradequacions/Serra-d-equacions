@@ -2,27 +2,12 @@
 <html lang="ca">
   <head>
     <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" href="/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#8fb382" />
     <title>Serra d'equacions</title>
     
-    <script>
-      // AQUEST ÉS EL "BOTÓ DEL PÀNIC"
-      // Si el navegador troba un Service Worker, el desregistra immediatament
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistrations().then(regs => {
-          for(let r of regs) {
-            r.unregister().then(() => console.log('SW eliminat amb èxit'));
-          }
-        });
-      }
-      // Esborra les carpetes de caché on viu el fitxer vell
-      if ('caches' in window) {
-        caches.keys().then(names => {
-          for (let name of names) caches.delete(name);
-        });
-      }
-    </script>
-  </head>
+    </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>

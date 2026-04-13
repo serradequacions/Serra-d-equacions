@@ -126,12 +126,14 @@ function App() {
     alert("✅ Avisos enviats i correus en cua!");
   };
 
+  // ACTUALITZACIÓ: Ara també envia correus en penjar material
   const crearMaterialMúltiple = async (e) => {
     e.preventDefault();
     const temaFinal = temaExistent === "nou" || !temaExistent ? temaMat : temaExistent;
     if (!temaFinal) { alert("Si us plau, indica un tema."); return; }
     
     for (const curs of cursosSeleccionatsMat) {
+      // Guardar a la base de dades
       await addDoc(collection(db, "materials"), { 
         nom: nomMat, 
         url: urlMat, 
@@ -139,9 +141,14 @@ function App() {
         categoria: curs, 
         createdAt: serverTimestamp() 
       });
+
+      // ENVIAR EMAIL DE BREVO PER AL NOU MATERIAL
+      const missatgeMaterial = `S'ha penjat nou material de ${temaFinal}: "${nomMat}". Ja el tens disponible a la plataforma!`;
+      enviarEmailsBrevo(curs, missatgeMaterial);
     }
+    
     setNomMat(''); setUrlMat(''); setTemaMat(''); setTemaExistent(''); setCursosSeleccionatsMat([]);
-    alert("✅ Materials afegits!");
+    alert("✅ Materials afegits i alumnes notificats!");
   };
 
   const canviarTemaMaterial = async (id, nouTema) => {
