@@ -18,7 +18,7 @@ import logoImg from './logo.png';
  * CONFIGURACIÓ DE SERVEIS
  * ============================================================================
  */
-const CLOUD_NAME = "EL_TEU_CLOUD_NAME"; // Substitueix amb el teu
+const CLOUD_NAME = "ducevp5vb"; // Substitueix amb el teu
 const UPLOAD_PRESET = "tasques_alumnes"; // Substitueix amb el teu (Unsigned)
 
 const firebaseConfig = {
