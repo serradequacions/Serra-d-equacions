@@ -38,38 +38,64 @@ export default function LoginPage({ logoImg }) {
     }
   };
 
+  // He adaptat les classes a: "auth-page", "auth-card", "login-input", "login-btn", etc.
+  // que són les que apareixen al teu index.css
   return (
-    <div className="login-page">
-      <div className="login-card">
-        <img src={logoImg} alt="Logo" className="login-logo" />
-        <h2>{isRegister ? 'Crea un compte' : 'Benvingut/da'}</h2>
-        {error && <p className="error-msg">{error}</p>}
+    <div className="auth-page">
+      <div className="auth-card">
+        <div className="auth-header">
+          <img src={logoImg} alt="Logo" className="auth-logo" style={{maxWidth: '180px', marginBottom: '1.5rem'}} />
+          <h2 className="auth-title">{isRegister ? 'Crea un compte' : 'Benvingut/da'}</h2>
+          <p className="auth-subtitle">Accedeix a la plataforma de Serra d'Equacions</p>
+        </div>
+
+        {error && (
+          <div className="status-msg error" style={{marginBottom: '1.5rem', display: 'block'}}>
+            {error}
+          </div>
+        )}
         
-        <form onSubmit={handleAuth}>
+        <form onSubmit={handleAuth} className="auth-form">
           {isRegister && (
-            <input 
-              type="text" placeholder="Nom complet" className="login-input"
-              value={name} onChange={(e) => setName(e.target.value)} required 
-            />
+            <div className="input-group">
+              <input 
+                type="text" placeholder="Nom complet" className="login-input"
+                value={name} onChange={(e) => setName(e.target.value)} required 
+              />
+            </div>
           )}
-          <input 
-            type="email" placeholder="Correu electrònic" className="login-input"
-            value={email} onChange={(e) => setEmail(e.target.value)} required 
-          />
-          <input 
-            type="password" placeholder="Contrasenya" className="login-input"
-            value={password} onChange={(e) => setPassword(e.target.value)} required 
-          />
+          <div className="input-group">
+            <input 
+              type="email" placeholder="Correu electrònic" className="login-input"
+              value={email} onChange={(e) => setEmail(e.target.value)} required 
+            />
+          </div>
+          <div className="input-group">
+            <input 
+              type="password" placeholder="Contrasenya" className="login-input"
+              value={password} onChange={(e) => setPassword(e.target.value)} required 
+            />
+          </div>
+          
           <button type="submit" className="login-btn">
-            {isRegister ? 'Registrar-me' : 'Entrar'}
+            {isRegister ? 'Registrar-me' : 'Iniciar Sessió'}
           </button>
         </form>
 
-        <button onClick={handleGoogle} className="google-btn">Entra amb Google</button>
+        <div className="auth-divider">
+          <span>O CONTINUA AMB</span>
+        </div>
+
+        <button onClick={handleGoogle} className="google-btn">
+          <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/action/google.svg" alt="" style={{width: '18px', marginRight: '10px'}} />
+          Entra amb Google
+        </button>
         
-        <p onClick={() => setIsRegister(!isRegister)} className="toggle-auth">
-          {isRegister ? 'Ja tens compte? Entra' : 'No tens compte? Registra’t'}
-        </p>
+        <div className="auth-footer">
+          <p onClick={() => setIsRegister(!isRegister)} style={{cursor: 'pointer', color: 'var(--brand-primary)', fontWeight: '500'}}>
+            {isRegister ? 'Ja tens compte? Inicia sessió' : 'No tens compte? Registra’t ara'}
+          </p>
+        </div>
       </div>
     </div>
   );
