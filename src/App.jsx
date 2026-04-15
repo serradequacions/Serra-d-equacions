@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { auth } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 
-// Importem els components que hem creat
 import LoginPage from './components/LoginPage';
 import AdminPanel from './components/AdminPanel';
 import StudentDashboard from './components/StudentDashboard';
@@ -31,16 +30,22 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  if (loading) return <div className="loading-screen">Carregant...</div>;
+  if (loading) return (
+    <div className="auth-page">
+      <div className="auth-card" style={{ textAlign: 'center' }}>
+        <p>Carregant sistema...</p>
+      </div>
+    </div>
+  );
 
   return (
     <>
       {!user ? (
-        <LoginPage logoImg={logoImg} />
+        <LoginPage logoImg={logoImg} APP_CONFIG={APP_CONFIG} />
       ) : user.email === APP_CONFIG.adminEmail ? (
-        <AdminPanel user={user} APP_CONFIG={APP_CONFIG} />
+        <AdminPanel logoImg={logoImg} APP_CONFIG={APP_CONFIG} />
       ) : (
-        <StudentDashboard user={user} APP_CONFIG={APP_CONFIG} />
+        <StudentDashboard user={user} logoImg={logoImg} APP_CONFIG={APP_CONFIG} />
       )}
     </>
   );
