@@ -1,51 +1,122 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { auth, db } from '../firebase';
 import { signOut } from 'firebase/auth';
-import { 
-  collection, 
-  addDoc, 
-  deleteDoc, 
-  doc, 
-  serverTimestamp, 
-  query, 
-  orderBy, 
-  setDoc, 
+import {
+  collection,
+  addDoc,
+  deleteDoc,
+  doc,
+  serverTimestamp,
+  query,
+  orderBy,
+  setDoc,
   onSnapshot,
   getDocs,
   where,
   updateDoc
 } from 'firebase/firestore';
 
+function TaulaRevisioTrameses({ entregues, colors, onGuardarNota }) {
+  if (entregues.length === 0) {
+    return (
+      <tr>
+        <td
+          colSpan={5}
+          style={{
+            padding: '40px 15px',
+            textAlign: 'center',
+            color: colors.textLight,
+            fontStyle: 'italic'
+          }}
+        >
+          Cap alumne ha lliurat aquesta tasca encara.
+        </td>
+      </tr>
+    );
+  }
+
+  return entregues.map((tramesa) => {
+    const urlFitxer = tramesa.urlCloudinary || tramesa.fileUrl || '';
+    const timestamp = tramesa.dataLliurament || tramesa.data;
+
+    return (
+      <tr key={tramesa.id} style={{ borderBottom: `1px solid ${colors.border}` }}>
+        <td style={{ padding: '14px 15px', fontWeight: '700' }}>
+          {tramesa.alumneNom || 'Alumne sense nom'}
+        </td>
+        <td style={{ padding: '14px 15px', color: colors.primary, fontWeight: '600', fontSize: '0.85rem' }}>
+          {tramesa.alumneCurs || tramesa.curs || '—'}
+        </td>
+        <td style={{ padding: '14px 15px', color: colors.textLight, fontSize: '0.85rem', whiteSpace: 'nowrap' }}>
+          {timestamp && typeof timestamp.toDate === 'function'
+            ? timestamp.toDate().toLocaleDateString('ca-ES')
+            : 'Sense data'}
+        </td>
+        <td style={{ padding: '14px 15px' }}>
+          {urlFitxer ? (
+            <a
+              href={urlFitxer}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: '#2563eb', fontWeight: 'bold', textDecoration: 'underline' }}
+            >
+              Veure Fitxer
+            </a>
+          ) : (
+            <span style={{ color: colors.textLight, fontSize: '0.8rem' }}>Sense arxiu</span>
+          )}
+        </td>
+        <td style={{ padding: '14px 15px' }}>
+          <input
+            type="number"
+            step="0.1"
+            min="0"
+            max="10"
+            placeholder="-"
+            defaultValue={tramesa.nota ?? ''}
+            key={`nota-revisio-${tramesa.id}-${tramesa.nota ?? 'buida'}`}
+            onBlur={(e) => onGuardarNota(tramesa.id, e.target.value)}
+            style={{
+              width: '70px',
+              padding: '8px',
+              borderRadius: '8px',
+              border: `1px solid ${colors.border}`,
+              textAlign: 'center',
+              fontWeight: '700'
+            }}
+          />
+        </td>
+      </tr>
+    );
+  });
+}
+
 export default function AdminPanel({ APP_CONFIG, logoImg }) {
-  // --- CONFIGURACIÓ DE CURSOS ---
   const LLISTA_CURSOS = [
-    "1r ESO", "2n ESO", "3r ESO", "4t ESO A", "4t ESO B",
-    "1r Batxillerat Científic", "1r Batxillerat CCSS", "1r Batxillerat General",
-    "2n Batxillerat Científic", "2n Batxillerat CCSS"
+    '1r ESO', '2n ESO', '3r ESO', '4t ESO A', '4t ESO B',
+    '1r Batxillerat Científic', '1r Batxillerat CCSS', '1r Batxillerat General',
+    '2n Batxillerat Científic', '2n Batxillerat CCSS'
   ];
 
   const WORKER_URL = 'https://brevo-proxy.serradequacions.workers.dev';
 
-  // --- ESTATS DE DADES ---
-  const [temesBD, setTemesBD] = useState({}); 
+  const [temesBD, setTemesBD] = useState({});
   const [materials, setMaterials] = useState([]);
   const [avisosLlista, setAvisosLlista] = useState([]);
-  const [trameses, setTrameses] = useState([]); 
-  
-  // --- ESTATS DE FORMULARIS ---
+  const [trameses, setTrameses] = useState([]);
+
   const [avisContingut, setAvisContingut] = useState('');
-  const [avisCursos, setAvisCursos] = useState([]); 
+  const [avisCursos, setAvisCursos] = useState([]);
   const [recursTitol, setRecursTitol] = useState('');
   const [recursUrl, setRecursUrl] = useState('');
   const [recursDescripcio, setRecursDescripcio] = useState('');
-  const [recursCursos, setRecursCursos] = useState([]); 
+  const [recursCursos, setRecursCursos] = useState([]);
   const [recursTipus, setRecursTipus] = useState('Teoria');
   const [recursTema, setRecursTema] = useState('');
   const [temaLliure, setTemaLliure] = useState('');
 
-  // --- ESTATS D'UI ---
-  const [activeTab, setActiveTab] = useState('avisos'); 
-  const [expandedCurs, setExpandedCurs] = useState(null); 
+  const [activeTab, setActiveTab] = useState('avisos');
+  const [expandedCurs, setExpandedCurs] = useState(null);
   const [isPublishing, setIsPublishing] = useState(false);
   const [materialRevisio, setMaterialRevisio] = useState(null);
 
@@ -63,7 +134,6 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
 
   const esTasca = (material) => material?.tipus?.toLowerCase().includes('tasca');
 
-  /** Coincideix amb els camps guardats des de StudentDashboard (materialId + materialTitol). */
   const entregaPertanyAMaterial = (entrega, material) => {
     if (!entrega || !material) return false;
 
@@ -83,77 +153,52 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
     return false;
   };
 
-  const getUrlArxiu = (tramesa) => tramesa?.urlCloudinary || tramesa?.fileUrl || '';
-
-  const getCursAlumne = (tramesa) => tramesa?.curs || tramesa?.alumneCurs || '—';
-
-  const getNomAlumne = (tramesa) => tramesa?.alumneNom || 'Alumne sense nom';
-
-  const formatFirebaseDate = (data) => {
-    if (!data) return '—';
-    try {
-      if (typeof data.toDate === 'function') {
-        return data.toDate().toLocaleString('ca-ES', {
-          day: 'numeric',
-          month: 'short',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit'
-        });
-      }
-      if (data instanceof Date) {
-        return data.toLocaleString('ca-ES');
-      }
-      if (typeof data.seconds === 'number') {
-        return new Date(data.seconds * 1000).toLocaleString('ca-ES');
-      }
-    } catch (e) {
-      console.warn('No s\'ha pogut formatar la data de l\'entrega:', e);
-    }
-    return '—';
-  };
-
   const entreguesPerRevisio = useMemo(() => {
     if (!materialRevisio) return [];
-    return trameses.filter((t) => entregaPertanyAMaterial(t, materialRevisio));
+    return trameses.filter((tramesa) => entregaPertanyAMaterial(tramesa, materialRevisio));
   }, [trameses, materialRevisio]);
 
   useEffect(() => {
-    const unsubMat = onSnapshot(query(collection(db, "materials"), orderBy("data", "desc")), (snap) => {
-      setMaterials(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    const unsubMat = onSnapshot(query(collection(db, 'materials'), orderBy('data', 'desc')), (snap) => {
+      setMaterials(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     });
 
-    const unsubAv = onSnapshot(query(collection(db, "avisos"), orderBy("data", "desc")), (snap) => {
-      setAvisosLlista(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    const unsubAv = onSnapshot(query(collection(db, 'avisos'), orderBy('data', 'desc')), (snap) => {
+      setAvisosLlista(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     });
 
-    const unsubTemes = onSnapshot(collection(db, "config_temes"), (snap) => {
+    const unsubTemes = onSnapshot(collection(db, 'config_temes'), (snap) => {
       const obj = {};
-      snap.forEach(d => obj[d.id] = d.data().llista || []);
+      snap.forEach((d) => {
+        obj[d.id] = d.data().llista || [];
+      });
       setTemesBD(obj);
     });
 
-    const unsubTram = onSnapshot(query(collection(db, "trameses"), orderBy("data", "desc")), (snap) => {
-      setTrameses(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    const unsubTram = onSnapshot(query(collection(db, 'trameses'), orderBy('data', 'desc')), (snap) => {
+      setTrameses(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     });
 
-    return () => { unsubMat(); unsubAv(); unsubTemes(); unsubTram(); };
+    return () => {
+      unsubMat();
+      unsubAv();
+      unsubTemes();
+      unsubTram();
+    };
   }, []);
 
-  // --- LÒGICA PER GUARDAR NOTA ---
   const handleGuardarNota = async (tramesaId, valor) => {
     if (!tramesaId) return;
     try {
       const nota = parseFloat(valor);
-      const updateData = (valor === '' || Number.isNaN(nota)) ? { nota: null } : { nota };
+      const updateData = valor === '' || Number.isNaN(nota) ? { nota: null } : { nota };
       await updateDoc(doc(db, 'trameses', tramesaId), updateData);
     } catch (e) {
       console.error('Error guardant nota:', e);
-      alert('No s\'ha pogut guardar la nota. Torna-ho a provar.');
+      alert("No s'ha pogut guardar la nota. Torna-ho a provar.");
     }
   };
 
-  // --- FIX OBERTURA FITXERS ---
   const obrirFitxer = (url) => {
     if (!url) return;
     const win = window.open(url, '_blank', 'noopener,noreferrer');
@@ -169,14 +214,13 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
     setMaterialRevisio(null);
   };
 
-  // --- LÒGICA DE NOTIFICACIÓ ---
   const getEmailsAlumnes = async (cursosSeleccionats) => {
     try {
-      const q = query(collection(db, "usuaris"), where("curs", "in", cursosSeleccionats));
+      const q = query(collection(db, 'usuaris'), where('curs', 'in', cursosSeleccionats));
       const snap = await getDocs(q);
-      return snap.docs.map(doc => doc.data().email).filter(email => !!email);
+      return snap.docs.map((d) => d.data().email).filter((email) => !!email);
     } catch (e) {
-      console.error("Error obtenint emails:", e);
+      console.error('Error obtenint emails:', e);
       return [];
     }
   };
@@ -191,67 +235,90 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           emails: llistaEmails,
-          tipus: tipus,
-          titol: titol,
-          contingut: contingut,
+          tipus,
+          titol,
+          contingut,
           url: 'https://serradequacions.github.io/Serra-d-equacions/'
         })
       });
-    } catch (e) { console.error("Error enviant notificació Worker:", e); }
+    } catch (e) {
+      console.error('Error enviant notificació Worker:', e);
+    }
   };
 
-  // --- LÒGICA DE PUBLICACIÓ ---
   const handlePublicarAvis = async () => {
-    if (!avisContingut || avisCursos.length === 0) return alert("Escriu un missatge i tria cursos.");
+    if (!avisContingut || avisCursos.length === 0) return alert('Escriu un missatge i tria cursos.');
     setIsPublishing(true);
     try {
-      await addDoc(collection(db, "avisos"), {
+      await addDoc(collection(db, 'avisos'), {
         contingut: avisContingut,
         cursos: avisCursos,
         data: serverTimestamp()
       });
       await handleNotificar('avis', 'Nou avís al campus', avisContingut, avisCursos);
-      setAvisContingut(''); setAvisCursos([]);
-      alert("Avís enviat.");
-    } catch (e) { alert(e.message); } finally { setIsPublishing(false); }
+      setAvisContingut('');
+      setAvisCursos([]);
+      alert('Avís enviat.');
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setIsPublishing(false);
+    }
   };
 
   const handlePublicarMaterial = async () => {
     const temaFinal = temaLliure || recursTema;
-    if (!recursTitol || recursCursos.length === 0 || !temaFinal) return alert("Falten dades.");
+    if (!recursTitol || recursCursos.length === 0 || !temaFinal) return alert('Falten dades.');
     setIsPublishing(true);
     try {
       if (temaLliure) {
         for (const c of recursCursos) {
           const actuals = temesBD[c] || [];
           if (!actuals.includes(temaLliure)) {
-            await setDoc(doc(db, "config_temes", c), { llista: [...actuals, temaLliure] });
+            await setDoc(doc(db, 'config_temes', c), { llista: [...actuals, temaLliure] });
           }
         }
       }
-      await addDoc(collection(db, "materials"), {
-        titol: recursTitol, url: recursUrl, descripcio: recursDescripcio,
-        cursos: recursCursos, tipus: recursTipus, tema: temaFinal, data: serverTimestamp()
+      await addDoc(collection(db, 'materials'), {
+        titol: recursTitol,
+        url: recursUrl,
+        descripcio: recursDescripcio,
+        cursos: recursCursos,
+        tipus: recursTipus,
+        tema: temaFinal,
+        data: serverTimestamp()
       });
       await handleNotificar('material', recursTitol, `Nou material: ${recursTitol}`, recursCursos);
-      setRecursTitol(''); setRecursUrl(''); setRecursDescripcio(''); setRecursTema(''); setTemaLliure(''); setRecursCursos([]);
-      alert("Material publicat.");
-    } catch (e) { alert(e.message); } finally { setIsPublishing(false); }
+      setRecursTitol('');
+      setRecursUrl('');
+      setRecursDescripcio('');
+      setRecursTema('');
+      setTemaLliure('');
+      setRecursCursos([]);
+      alert('Material publicat.');
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setIsPublishing(false);
+    }
   };
 
   const handleEsborrar = async (col, id) => {
-    if (window.confirm("Eliminar?")) {
-      try { await deleteDoc(doc(db, col, id)); } catch (e) { alert(e.message); }
+    if (window.confirm('Eliminar?')) {
+      try {
+        await deleteDoc(doc(db, col, id));
+      } catch (e) {
+        alert(e.message);
+      }
     }
   };
 
   const toggleCheckbox = (curs, state, setState) => {
-    setState(prev => prev.includes(curs) ? prev.filter(c => c !== curs) : [...prev, curs]);
+    setState((prev) => (prev.includes(curs) ? prev.filter((c) => c !== curs) : [...prev, curs]));
   };
 
   return (
     <div style={{ backgroundColor: colors.bg, minHeight: '100vh', padding: '40px 20px', fontFamily: '"Inter", sans-serif' }}>
-      
       <header style={{ maxWidth: '1250px', margin: '0 auto 40px auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
           {logoImg && <img src={logoImg} alt="Logo" style={{ height: '60px', borderRadius: '12px' }} />}
@@ -261,13 +328,12 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
       </header>
 
       <div style={{ maxWidth: '1250px', margin: '0 auto', display: 'grid', gridTemplateColumns: '400px 1fr', gap: '30px' }}>
-        
         <aside>
           <div style={cardStyle(colors)}>
             <h3 style={cardTitleStyle(colors)}>📢 Crear Nou Avís</h3>
             <textarea placeholder="Missatge..." value={avisContingut} onChange={(e) => setAvisContingut(e.target.value)} style={textareaStyle(colors)} />
             <div style={checkboxGrid}>
-              {LLISTA_CURSOS.map(curs => (
+              {LLISTA_CURSOS.map((curs) => (
                 <label key={curs} style={checkLabel}>
                   <input type="checkbox" checked={avisCursos.includes(curs)} onChange={() => toggleCheckbox(curs, avisCursos, setAvisCursos)} /> {curs}
                 </label>
@@ -285,7 +351,7 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
             <div style={{ marginBottom: '12px' }}>
               <div style={{ fontSize: '0.75rem', color: colors.textLight, marginBottom: '8px', fontWeight: '600' }}>Tipus</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                {Object.keys(APP_CONFIG?.tipusIcons || {}).map(t => (
+                {Object.keys(APP_CONFIG?.tipusIcons || {}).map((t) => (
                   <button
                     key={t}
                     type="button"
@@ -314,12 +380,14 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
 
             <select value={recursTema} onChange={(e) => setRecursTema(e.target.value)} style={inputStyle(colors)}>
               <option value="">Tema...</option>
-              {[...new Set(recursCursos.flatMap(c => temesBD[c] || []))].map(t => <option key={t} value={t}>{t}</option>)}
+              {[...new Set(recursCursos.flatMap((c) => temesBD[c] || []))].map((t) => (
+                <option key={t} value={t}>{t}</option>
+              ))}
             </select>
 
             <input placeholder="Nou tema..." value={temaLliure} onChange={(e) => setTemaLliure(e.target.value)} style={inputStyle(colors)} />
             <div style={checkboxGrid}>
-              {LLISTA_CURSOS.map(curs => (
+              {LLISTA_CURSOS.map((curs) => (
                 <label key={curs} style={checkLabel}>
                   <input type="checkbox" checked={recursCursos.includes(curs)} onChange={() => toggleCheckbox(curs, recursCursos, setRecursCursos)} /> {curs}
                 </label>
@@ -358,34 +426,41 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
                       </td>
                     </tr>
                   ) : (
-                    trameses.map(t => (
-                      <tr key={t.id} style={{ borderBottom: `1px solid ${colors.border}` }}>
-                        <td style={{ padding: '15px' }}>
-                          <div style={{ fontWeight: '700' }}>{t.alumneNom || 'Alumne sense nom'}</div>
-                          <div style={{ fontSize: '0.75rem', color: colors.primary }}>{t.curs || '—'}</div>
-                        </td>
-                        <td style={{ padding: '15px' }}>{t.materialTitol || '—'}</td>
-                        <td style={{ padding: '15px' }}>
-                          {t.fileUrl ? (
-                            <button onClick={() => obrirFitxer(t.fileUrl)} style={revisarBtnStyle(colors)}>👁️ Veure</button>
-                          ) : (
-                            <span style={{ color: colors.textLight, fontSize: '0.8rem' }}>Sense arxiu</span>
-                          )}
-                        </td>
-                        <td style={{ padding: '15px' }}>
-                          <input 
-                            type="number" step="0.1" min="0" max="10" placeholder="-"
-                            defaultValue={t.nota ?? ''}
-                            key={`nota-global-${t.id}-${t.nota ?? 'buida'}`}
-                            onBlur={(e) => handleGuardarNota(t.id, e.target.value)}
-                            style={{ width: '60px', padding: '8px', borderRadius: '8px', border: `1px solid ${colors.border}`, textAlign: 'center', fontWeight: '700' }}
-                          />
-                        </td>
-                        <td style={{ padding: '15px' }}>
-                          <button onClick={() => handleEsborrar('trameses', t.id)} style={deleteBtn}>✕</button>
-                        </td>
-                      </tr>
-                    ))
+                    trameses.map((tramesa) => {
+                      const urlFitxer = tramesa.urlCloudinary || tramesa.fileUrl || '';
+                      return (
+                        <tr key={tramesa.id} style={{ borderBottom: `1px solid ${colors.border}` }}>
+                          <td style={{ padding: '15px' }}>
+                            <div style={{ fontWeight: '700' }}>{tramesa.alumneNom || 'Alumne sense nom'}</div>
+                            <div style={{ fontSize: '0.75rem', color: colors.primary }}>{tramesa.alumneCurs || tramesa.curs || '—'}</div>
+                          </td>
+                          <td style={{ padding: '15px' }}>{tramesa.materialTitol || '—'}</td>
+                          <td style={{ padding: '15px' }}>
+                            {urlFitxer ? (
+                              <button type="button" onClick={() => obrirFitxer(urlFitxer)} style={revisarBtnStyle(colors)}>👁️ Veure</button>
+                            ) : (
+                              <span style={{ color: colors.textLight, fontSize: '0.8rem' }}>Sense arxiu</span>
+                            )}
+                          </td>
+                          <td style={{ padding: '15px' }}>
+                            <input
+                              type="number"
+                              step="0.1"
+                              min="0"
+                              max="10"
+                              placeholder="-"
+                              defaultValue={tramesa.nota ?? ''}
+                              key={`nota-global-${tramesa.id}-${tramesa.nota ?? 'buida'}`}
+                              onBlur={(e) => handleGuardarNota(tramesa.id, e.target.value)}
+                              style={{ width: '60px', padding: '8px', borderRadius: '8px', border: `1px solid ${colors.border}`, textAlign: 'center', fontWeight: '700' }}
+                            />
+                          </td>
+                          <td style={{ padding: '15px' }}>
+                            <button type="button" onClick={() => handleEsborrar('trameses', tramesa.id)} style={deleteBtn}>✕</button>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
@@ -393,65 +468,61 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
           )}
 
           {activeTab === 'avisos' && (
-             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-               {avisosLlista.map(a => (
-                 <div key={a.id} style={listItemStyle(colors)}>
-                    <div style={{ flex: 1 }}>
-                      <p style={{ margin: '0 0 8px 0', fontSize: '0.95rem' }}>{a.contingut}</p>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
-                        {a.cursos?.map(c => <span key={c} style={badgeStyle(colors)}>{c}</span>)}
-                      </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {avisosLlista.map((a) => (
+                <div key={a.id} style={listItemStyle(colors)}>
+                  <div style={{ flex: 1 }}>
+                    <p style={{ margin: '0 0 8px 0', fontSize: '0.95rem' }}>{a.contingut}</p>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
+                      {a.cursos?.map((c) => (
+                        <span key={c} style={badgeStyle(colors)}>{c}</span>
+                      ))}
                     </div>
-                    <button onClick={() => handleEsborrar('avisos', a.id)} style={deleteBtn}>✕</button>
-                 </div>
-               ))}
-             </div>
+                  </div>
+                  <button type="button" onClick={() => handleEsborrar('avisos', a.id)} style={deleteBtn}>✕</button>
+                </div>
+              ))}
+            </div>
           )}
 
           {activeTab === 'materials' && (
             <div>
-               {LLISTA_CURSOS.map(curs => (
-                 <div key={curs} style={cursAccordion(colors)}>
-                    <div onClick={() => setExpandedCurs(expandedCurs === curs ? null : curs)} style={cursHeader(colors)}>
-                      <span style={{ fontWeight: '700' }}>📂 {curs}</span>
-                      <span style={{ fontSize: '0.8rem', opacity: 0.6 }}>
-                        {materials.filter(m => m.cursos?.includes(curs)).length} elements
-                      </span>
-                    </div>
-                    {expandedCurs === curs && (
-                      <div style={{ padding: '10px 20px', backgroundColor: 'white' }}>
-                        {materials.filter(m => m.cursos?.includes(curs)).map(m => {
-                          const numEntregues = trameses.filter((t) => entregaPertanyAMaterial(t, m)).length;
-                          return (
-                            <div key={m.id} style={materialRow(colors)}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0 }}>
-                                <span style={{ fontSize: '1.2rem' }}>
-                                  {APP_CONFIG?.tipusIcons?.[m.tipus] || '📄'}
-                                </span>
-                                <div style={{ minWidth: 0 }}>
-                                  <div style={{ fontWeight: '600', fontSize: '0.9rem' }}>{m.titol}</div>
-                                  <div style={{ fontSize: '0.7rem', color: colors.textLight }}>{m.tema} · {m.tipus}</div>
-                                </div>
-                              </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
-                                {esTasca(m) && (
-                                  <button
-                                    type="button"
-                                    onClick={() => obrirRevisio(m)}
-                                    style={revisarBtnStyle(colors)}
-                                  >
-                                    Revisar {numEntregues > 0 && `(${numEntregues})`}
-                                  </button>
-                                )}
-                                <button onClick={() => handleEsborrar('materials', m.id)} style={deleteTextBtn}>Eliminar</button>
+              {LLISTA_CURSOS.map((curs) => (
+                <div key={curs} style={cursAccordion(colors)}>
+                  <div onClick={() => setExpandedCurs(expandedCurs === curs ? null : curs)} style={cursHeader(colors)}>
+                    <span style={{ fontWeight: '700' }}>📂 {curs}</span>
+                    <span style={{ fontSize: '0.8rem', opacity: 0.6 }}>
+                      {materials.filter((m) => m.cursos?.includes(curs)).length} elements
+                    </span>
+                  </div>
+                  {expandedCurs === curs && (
+                    <div style={{ padding: '10px 20px', backgroundColor: 'white' }}>
+                      {materials.filter((m) => m.cursos?.includes(curs)).map((m) => {
+                        const numEntregues = trameses.filter((tramesa) => entregaPertanyAMaterial(tramesa, m)).length;
+                        return (
+                          <div key={m.id} style={materialRow(colors)}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0 }}>
+                              <span style={{ fontSize: '1.2rem' }}>{APP_CONFIG?.tipusIcons?.[m.tipus] || '📄'}</span>
+                              <div style={{ minWidth: 0 }}>
+                                <div style={{ fontWeight: '600', fontSize: '0.9rem' }}>{m.titol}</div>
+                                <div style={{ fontSize: '0.7rem', color: colors.textLight }}>{m.tema} · {m.tipus}</div>
                               </div>
                             </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                 </div>
-               ))}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
+                              {esTasca(m) && (
+                                <button type="button" onClick={() => obrirRevisio(m)} style={revisarBtnStyle(colors)}>
+                                  Revisar {numEntregues > 0 ? `(${numEntregues})` : ''}
+                                </button>
+                              )}
+                              <button type="button" onClick={() => handleEsborrar('materials', m.id)} style={deleteTextBtn}>Eliminar</button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
           )}
         </main>
@@ -492,74 +563,17 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {entreguesPerRevisio.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} style={{ padding: '40px 15px', textAlign: 'center', color: colors.textLight, fontStyle: 'italic' }}>
-                        Cap alumne ha lliurat aquesta tasca encara.
-                      </td>
-                    </tr>
-                  ) : (
-                    entreguesPerRevisio.map((tramesa) => {
-                      const urlArxiu = getUrlArxiu(tramesa);
-                      return (
-                        <tr key={tramesa.id} style={{ borderBottom: `1px solid ${colors.border}` }}>
-                          <td style={{ padding: '14px 15px', fontWeight: '700' }}>
-                            {getNomAlumne(tramesa)}
-                          </td>
-                          <td style={{ padding: '14px 15px', color: colors.primary, fontWeight: '600', fontSize: '0.85rem' }}>
-                            {getCursAlumne(tramesa)}
-                          </td>
-                          <td style={{ padding: '14px 15px', color: colors.textLight, fontSize: '0.85rem', whiteSpace: 'nowrap' }}>
-                            {formatFirebaseDate(tramesa.data)}
-                          </td>
-                          <td style={{ padding: '14px 15px' }}>
-                            {urlArxiu ? (
-                              <a
-                                href={urlArxiu}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                style={linkArxiuStyle(colors)}
-                                title={tramesa.fileName || 'Obrir lliurament a Cloudinary'}
-                              >
-                                {tramesa.fileName || 'Veure arxiu'}
-                              </a>
-                            ) : (
-                              <span style={{ color: colors.textLight, fontSize: '0.8rem' }}>Sense arxiu</span>
-                            )}
-                          </td>
-                          <td style={{ padding: '14px 15px' }}>
-                            <input
-                              type="number"
-                              step="0.1"
-                              min="0"
-                              max="10"
-                              placeholder="-"
-                              defaultValue={tramesa.nota ?? ''}
-                              key={`nota-revisio-${tramesa.id}-${tramesa.nota ?? 'buida'}`}
-                              onBlur={(e) => handleGuardarNota(tramesa.id, e.target.value)}
-                              style={{
-                                width: '70px',
-                                padding: '8px',
-                                borderRadius: '8px',
-                                border: `1px solid ${colors.border}`,
-                                textAlign: 'center',
-                                fontWeight: '700'
-                              }}
-                            />
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
+                  <TaulaRevisioTrameses
+                    entregues={entreguesPerRevisio}
+                    colors={colors}
+                    onGuardarNota={handleGuardarNota}
+                  />
                 </tbody>
               </table>
             </div>
 
             <div style={{ marginTop: '20px', fontSize: '0.8rem', color: colors.textLight, fontWeight: '600' }}>
               {entreguesPerRevisio.length} entrega{entreguesPerRevisio.length === 1 ? '' : 'es'} per aquesta tasca
-              {materialRevisio.id && (
-                <span style={{ marginLeft: '8px', opacity: 0.7 }}>· ID material: {materialRevisio.id}</span>
-              )}
             </div>
           </div>
         </div>
@@ -587,14 +601,6 @@ const cursHeader = (c) => ({ padding: '15px 20px', backgroundColor: '#f8fafc', d
 const materialRow = (c) => ({ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: `1px solid ${c.border}`, gap: '15px' });
 const counterBadge = { backgroundColor: '#ef4444', color: 'white', padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', marginLeft: '8px' };
 const revisarBtnStyle = (c) => ({ backgroundColor: '#eff6ff', color: c.primary, padding: '8px 14px', borderRadius: '8px', textDecoration: 'none', fontSize: '0.8rem', fontWeight: '700', border: `1px solid ${c.accent}`, cursor: 'pointer', whiteSpace: 'nowrap' });
-
-const linkArxiuStyle = (c) => ({
-  color: c.primary,
-  fontWeight: '700',
-  fontSize: '0.85rem',
-  textDecoration: 'underline',
-  textUnderlineOffset: '3px'
-});
 
 const modalOverlayStyle = {
   position: 'fixed',

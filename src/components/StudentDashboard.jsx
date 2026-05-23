@@ -261,7 +261,8 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
         fileUrl: data.secure_url,
         urlCloudinary: data.secure_url,
         fileName: file.name,
-        data: serverTimestamp()
+        data: serverTimestamp(),
+        dataLliurament: serverTimestamp()
       };
 
       await addDoc(collection(db, "trameses"), dadesEntrega);
