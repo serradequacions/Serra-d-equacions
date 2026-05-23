@@ -1,157 +1,476 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { auth, db } from '../firebase';
 import { 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
-  signInWithPopup, 
-  GoogleAuthProvider,
-  sendPasswordResetEmail 
+  sendPasswordResetEmail,
+  onAuthStateChanged
 } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 
-export default function LoginPage({ logoImg, APP_CONFIG }) {
-  const [email, setEmail] = useState('');
-  const [pass, setPass] = useState('');
-  const [cursAlumne, setCursAlumne] = useState(APP_CONFIG.cursosOpcions[0]); // Nou estat per al curs
-  const [isRegister, setIsRegister] = useState(false);
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [resetSent, setResetSent] = useState(false);
+/**
+ * LoginPage.jsx
+ * Component d'autenticació premium per al Campus Serra.
+ * Inclou: Login, Registre (amb selecció de curs) i Recuperació de contrasenya.
+ */
 
-  const handleAuth = async (e) => {
+export default function LoginPage({ APP_CONFIG, logoImg }) {
+  // --- ESTATS DE NAVEGACIÓ I INTERFAZ ---
+  const [mode, setMode] = useState('login'); // 'login', 'register', 'reset'
+  const [isFocused, setIsFocused] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
+
+  // --- ESTATS DE FORMULARI ---
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [nom, setNom] = useState('');
+  const [curs, setCurs] = useState('');
+
+  // --- LLISTA DE CURSOS (Sincronitzada amb AdminPanel.jsx) ---
+  const LLISTA_CURSOS = [
+    "1r ESO", "2n ESO", "3r ESO", "4t ESO A", "4t ESO B",
+    "1r Batxillerat Científic", "1r Batxillerat CCSS", "1r Batxillerat General",
+    "2n Batxillerat Científic", "2n Batxillerat CCSS"
+  ];
+
+  // --- LÒGICA D'AUTENTICACIÓ ---
+
+  const handleLogin = async (e) => {
     e.preventDefault();
-    setError('');
+    if (!email || !password) return setError("Omple tots els camps.");
+    
     setLoading(true);
+    setError('');
     try {
-      if (isRegister) {
-        const res = await createUserWithEmailAndPassword(auth, email, pass);
-        // Creem el perfil amb el curs seleccionat
-        await setDoc(doc(db, "users", res.user.uid), {
-          email: res.user.email,
-          role: 'student',
-          curs: cursAlumne, // Guardem el curs seleccionat
-          created: new Date()
-        });
-      } else {
-        await signInWithEmailAndPassword(auth, email, pass);
-      }
+      await signInWithEmailAndPassword(auth, email, password);
     } catch (err) {
-      console.error(err);
-      if (err.code === 'auth/user-not-found') setError('Aquest usuari no existeix.');
-      else if (err.code === 'auth/wrong-password') setError('Contrasenya incorrecta.');
-      else if (err.code === 'auth/email-already-in-use') setError('Aquest correu ja està registrat.');
-      else setError('Error: ' + err.message);
+      console.error("Login error:", err);
+      setError("Credencials incorrectes o l'usuari no existeix.");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleGoogle = async () => {
-    const provider = new GoogleAuthProvider();
+  const handleRegister = async (e) => {
+    e.preventDefault();
+    setError('');
+    
+    if (password !== confirmPassword) return setError("Les contrasenyes no coincideixen.");
+    if (!curs) return setError("Has de seleccionar un curs.");
+    if (password.length < 6) return setError("La contrasenya ha de tenir almenys 6 caràcters.");
+
+    setLoading(true);
     try {
-      const res = await signInWithPopup(auth, provider);
-      const userDoc = await getDoc(doc(db, "users", res.user.uid));
-      if (!userDoc.exists()) {
-        await setDoc(doc(db, "users", res.user.uid), {
-          email: res.user.email,
-          role: 'student',
-          curs: APP_CONFIG.cursosOpcions[0] // Curs per defecte a Google
-        });
-      }
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+      
+      // Creació del perfil a Firestore
+      await setDoc(doc(db, "usuaris", user.uid), {
+        uid: user.uid,
+        nom: nom,
+        email: email,
+        curs: curs,
+        rol: 'alumne',
+        createdAt: new Date().toISOString()
+      });
+      
     } catch (err) {
-      setError("Error amb Google: " + err.message);
+      console.error("Registration error:", err);
+      if (err.code === 'auth/email-already-in-use') {
+        setError("Aquest correu ja està registrat.");
+      } else {
+        setError("Error en crear el compte. Intenta-ho més tard.");
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleForgotPassword = async () => {
-    if (!email) {
-      setError('Escriu el teu correu per recuperar la contrasenya.');
-      return;
-    }
+  const handleResetPassword = async (e) => {
+    e.preventDefault();
+    if (!email) return setError("Introdueix el teu correu electrònic.");
+    
+    setLoading(true);
+    setError('');
+    setMessage('');
     try {
       await sendPasswordResetEmail(auth, email);
-      setResetSent(true);
-      setError('');
+      setMessage("S'ha enviat un enllaç al teu correu per restablir la contrasenya.");
     } catch (err) {
-      setError('No s\'ha pogut enviar el correu de recuperació.');
+      console.error("Reset error:", err);
+      setError("No s'ha pogut enviar el correu. Revisa l'adreça.");
+    } finally {
+      setLoading(false);
     }
   };
 
+  // --- DEFINICIÓ D'ESTILS (ESTÈTICA PREMIUM) ---
+
+  const colors = {
+    primary: '#2563eb',
+    primaryHover: '#1d4ed8',
+    bg: '#f8fafc',
+    card: '#ffffff',
+    textDark: '#0f172a',
+    textLight: '#64748b',
+    border: '#e2e8f0',
+    danger: '#ef4444',
+    success: '#10b981',
+    accent: '#3b82f6',
+    shadow: 'rgba(37, 99, 235, 0.08)'
+  };
+
+  const containerStyle = {
+    display: 'flex',
+    minHeight: '100vh',
+    width: '100vw',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.bg,
+    fontFamily: '"Inter", "Segoe UI", Roboto, sans-serif',
+    padding: '20px',
+    boxSizing: 'border-box',
+    overflowX: 'hidden'
+  };
+
+  const cardStyle = {
+    background: colors.card,
+    borderRadius: '24px',
+    padding: '48px',
+    border: `1px solid ${colors.border}`,
+    boxShadow: `0 25px 50px -12px ${colors.shadow}, 0 10px 15px -3px ${colors.shadow}`,
+    width: '100%',
+    maxWidth: '480px',
+    boxSizing: 'border-box',
+    animation: 'slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1)'
+  };
+
+  const headerSection = {
+    textAlign: 'center',
+    marginBottom: '32px'
+  };
+
+  const logoStyle = {
+    height: '75px',
+    width: 'auto',
+    marginBottom: '20px',
+    objectFit: 'contain'
+  };
+
+  const titleStyle = {
+    margin: '0 0 8px 0',
+    color: colors.textDark,
+    fontSize: '1.85rem',
+    fontWeight: '850',
+    letterSpacing: '-0.025em'
+  };
+
+  const subtitleStyle = {
+    margin: 0,
+    color: colors.textLight,
+    fontSize: '1rem',
+    lineHeight: '1.6'
+  };
+
+  const formGroupStyle = {
+    marginBottom: '20px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px'
+  };
+
+  const labelStyle = (focused) => ({
+    fontSize: '0.875rem',
+    fontWeight: '700',
+    color: focused ? colors.primary : colors.textDark,
+    transition: 'color 0.2s ease',
+    paddingLeft: '2px'
+  });
+
+  const inputContainerStyle = (focused) => ({
+    display: 'flex',
+    alignItems: 'center',
+    width: '100%',
+    padding: '14px 18px',
+    borderRadius: '14px',
+    border: focused ? `2px solid ${colors.primary}` : `1px solid ${colors.border}`,
+    backgroundColor: focused ? '#fff' : '#fcfcfd',
+    boxSizing: 'border-box',
+    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+    boxShadow: focused ? `0 0 0 4px rgba(37, 99, 235, 0.1)` : 'none'
+  });
+
+  const inputBaseStyle = {
+    border: 'none',
+    outline: 'none',
+    width: '100%',
+    fontSize: '1rem',
+    color: colors.textDark,
+    backgroundColor: 'transparent',
+    padding: 0
+  };
+
+  const iconStyle = (focused) => ({
+    marginRight: '12px',
+    fontSize: '1.2rem',
+    color: focused ? colors.primary : colors.textLight,
+    transition: 'color 0.2s ease'
+  });
+
+  const alertBoxStyle = (type) => ({
+    backgroundColor: type === 'error' ? '#fff1f2' : '#f0fdf4',
+    color: type === 'error' ? colors.danger : colors.success,
+    padding: '16px',
+    borderRadius: '14px',
+    marginBottom: '24px',
+    fontSize: '0.9rem',
+    fontWeight: '600',
+    border: `1px solid ${type === 'error' ? '#ffe4e6' : '#dcfce7'}`,
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+    animation: 'shake 0.4s linear'
+  });
+
+  const mainButtonStyle = {
+    width: '100%',
+    padding: '16px',
+    backgroundColor: colors.primary,
+    color: 'white',
+    border: 'none',
+    borderRadius: '14px',
+    fontWeight: '750',
+    cursor: loading ? 'not-allowed' : 'pointer',
+    fontSize: '1.05rem',
+    transition: 'all 0.3s ease',
+    marginTop: '10px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '12px',
+    boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)'
+  };
+
+  const secondaryBtnStyle = {
+    background: 'none',
+    border: 'none',
+    color: colors.primary,
+    cursor: 'pointer',
+    fontWeight: '700',
+    fontSize: '0.925rem',
+    marginTop: '20px',
+    textAlign: 'center',
+    display: 'block',
+    width: '100%',
+    transition: 'opacity 0.2s'
+  };
+
+  const dividerStyle = {
+    margin: '32px 0',
+    height: '1px',
+    background: colors.border,
+    position: 'relative'
+  };
+
+  // --- RENDERITZAT DE FORMULARIS ---
+
   return (
-    <div className="auth-page">
-      <div className="auth-card">
-        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <img src={logoImg} alt="Logo" style={{ width: '100px', marginBottom: '1rem' }} />
-          <h1 style={{ fontSize: '1.8rem', color: 'var(--brand-dark)', fontWeight: '800' }}>
-            {isRegister ? 'Crear Compte' : 'Aula Virtual'}
+    <div style={containerStyle}>
+      <style>
+        {`
+          @keyframes slideUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+          @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+          }
+          input::placeholder { color: #94a3b8; }
+          button:hover { opacity: 0.9; transform: translateY(-1px); }
+          button:active { transform: translateY(0); }
+          .loader {
+            width: 18px;
+            height: 18px;
+            border: 2px solid #FFF;
+            border-bottom-color: transparent;
+            border-radius: 50%;
+            display: inline-block;
+            animation: rotation 1s linear infinite;
+          }
+          @keyframes rotation {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+        `}
+      </style>
+
+      <div style={cardStyle}>
+        {/* HEADER */}
+        <div style={headerSection}>
+          {logoImg && <img src={logoImg} alt="Campus Logo" style={logoStyle} />}
+          <h1 style={titleStyle}>
+            {mode === 'login' ? 'Benvingut/da' : mode === 'register' ? 'Crea un compte' : 'Recuperar accés'}
           </h1>
-          <p style={{ color: '#5c7a7a', fontSize: '0.9rem' }}>Serra d'Equacions</p>
+          <p style={subtitleStyle}>
+            {mode === 'login' && "Accedeix al Campus Serra per gestionar el teu curs."}
+            {mode === 'register' && "Registra't per accedir als materials de la teva classe."}
+            {mode === 'reset' && "T'enviarem un correu electrònic per restablir el teu compte."}
+          </p>
         </div>
 
-        {error && <div className="status-msg error" style={{marginBottom: '1rem'}}>{error}</div>}
-        {resetSent && <div className="status-msg success" style={{marginBottom: '1rem'}}>Correu de recuperació enviat!</div>}
+        {/* ALERTES */}
+        {error && <div style={alertBoxStyle('error')}><span>⚠️</span> {error}</div>}
+        {message && <div style={alertBoxStyle('success')}><span>✅</span> {message}</div>}
 
-        <form onSubmit={handleAuth}>
-          <div style={{ marginBottom: '1rem' }}>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem', fontWeight: '600' }}>Correu Electrònic</label>
-            <input 
-              type="email" placeholder="nom@exemple.com" className="login-input" 
-              value={email} onChange={(e) => setEmail(e.target.value)} required 
-            />
+        {/* FORMULARI DINÀMIC */}
+        <form onSubmit={mode === 'login' ? handleLogin : mode === 'register' ? handleRegister : handleResetPassword}>
+          
+          {mode === 'register' && (
+            <>
+              <div style={formGroupStyle}>
+                <label style={labelStyle(isFocused === 'nom')}>Nom i Cognoms</label>
+                <div style={inputContainerStyle(isFocused === 'nom')}>
+                  <span style={iconStyle(isFocused === 'nom')}>👤</span>
+                  <input 
+                    style={inputBaseStyle}
+                    type="text" 
+                    value={nom} 
+                    onChange={(e) => setNom(e.target.value)}
+                    onFocus={() => setIsFocused('nom')}
+                    onBlur={() => setIsFocused(null)}
+                    placeholder="Escriu el teu nom complet"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div style={formGroupStyle}>
+                <label style={labelStyle(isFocused === 'curs')}>El teu Curs</label>
+                <div style={inputContainerStyle(isFocused === 'curs')}>
+                  <span style={iconStyle(isFocused === 'curs')}>🏫</span>
+                  <select 
+                    style={{...inputBaseStyle, appearance: 'none', cursor: 'pointer'}}
+                    value={curs}
+                    onChange={(e) => setCurs(e.target.value)}
+                    onFocus={() => setIsFocused('curs')}
+                    onBlur={() => setIsFocused(null)}
+                    required
+                  >
+                    <option value="">Selecciona el teu curs...</option>
+                    {LLISTA_CURSOS.map(c => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </>
+          )}
+
+          <div style={formGroupStyle}>
+            <label style={labelStyle(isFocused === 'email')}>Correu electrònic</label>
+            <div style={inputContainerStyle(isFocused === 'email')}>
+              <span style={iconStyle(isFocused === 'email')}>✉️</span>
+              <input 
+                style={inputBaseStyle}
+                type="email" 
+                value={email} 
+                onChange={(e) => setEmail(e.target.value)}
+                onFocus={() => setIsFocused('email')}
+                onBlur={() => setIsFocused(null)}
+                placeholder="alumne@escola.com"
+                required
+              />
+            </div>
           </div>
 
-          <div style={{ marginBottom: '1rem' }}>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem', fontWeight: '600' }}>Contrasenya</label>
-            <input 
-              type="password" placeholder="••••••••" className="login-input" 
-              value={pass} onChange={(e) => setPass(e.target.value)} required 
-            />
-          </div>
-
-          {isRegister && (
-            <div style={{ marginBottom: '1.5rem' }}>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem', fontWeight: '600' }}>Selecciona el teu curs</label>
-              <select 
-                className="login-input" 
-                value={cursAlumne} 
-                onChange={(e) => setCursAlumne(e.target.value)}
-              >
-                {APP_CONFIG.cursosOpcions.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
+          {mode !== 'reset' && (
+            <div style={formGroupStyle}>
+              <label style={labelStyle(isFocused === 'pass')}>Contrasenya</label>
+              <div style={inputContainerStyle(isFocused === 'pass')}>
+                <span style={iconStyle(isFocused === 'pass')}>🔒</span>
+                <input 
+                  style={inputBaseStyle}
+                  type="password" 
+                  value={password} 
+                  onChange={(e) => setPassword(e.target.value)}
+                  onFocus={() => setIsFocused('pass')}
+                  onBlur={() => setIsFocused(null)}
+                  placeholder="••••••••"
+                  required
+                />
+              </div>
             </div>
           )}
 
-          {!isRegister && (
-            <div style={{ textAlign: 'right', marginBottom: '1.5rem' }}>
-              <button type="button" onClick={handleForgotPassword} style={{ background: 'none', border: 'none', color: 'var(--brand-medium)', fontSize: '0.8rem', cursor: 'pointer', textDecoration: 'underline' }}>
-                Has oblidat la contrasenya?
-              </button>
+          {mode === 'register' && (
+            <div style={formGroupStyle}>
+              <label style={labelStyle(isFocused === 'confirm')}>Repetir contrasenya</label>
+              <div style={inputContainerStyle(isFocused === 'confirm')}>
+                <span style={iconStyle(isFocused === 'confirm')}>🔄</span>
+                <input 
+                  style={inputBaseStyle}
+                  type="password" 
+                  value={confirmPassword} 
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  onFocus={() => setIsFocused('confirm')}
+                  onBlur={() => setIsFocused(null)}
+                  placeholder="Repeteix la contrasenya"
+                  required
+                />
+              </div>
             </div>
           )}
 
-          <button type="submit" className="login-btn" disabled={loading}>
-            {loading ? 'Processant...' : (isRegister ? 'REGISTRAR-SE ARA' : 'INICIAR SESSIÓ')}
+          <button type="submit" style={mainButtonStyle} disabled={loading}>
+            {loading ? <span className="loader"></span> : (
+              mode === 'login' ? 'Iniciar Sessió' : mode === 'register' ? 'Crear compte' : 'Enviar enllaç'
+            )}
           </button>
         </form>
 
-        <div style={{ margin: '1.5rem 0', display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div style={{ flex: 1, height: '1px', background: '#d4e4d4' }}></div>
-          <span style={{ fontSize: '0.8rem', color: '#888' }}>O</span>
-          <div style={{ flex: 1, height: '1px', background: '#d4e4d4' }}></div>
+        {/* NAVEGACIÓ ENTRE MODES */}
+        <div style={{ marginTop: '20px' }}>
+          {mode === 'login' && (
+            <button style={secondaryBtnStyle} onClick={() => { setMode('reset'); setError(''); setMessage(''); }}>
+              He oblidat la contrasenya
+            </button>
+          )}
+          
+          <div style={dividerStyle}>
+            <span style={{ 
+              position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', 
+              background: '#fff', padding: '0 15px', color: colors.textLight, fontSize: '0.8rem' 
+            }}>O</span>
+          </div>
+
+          <button 
+            style={{...secondaryBtnStyle, color: colors.textDark, border: `1px solid ${colors.border}`, padding: '12px', borderRadius: '12px', marginTop: '0'}}
+            onClick={() => {
+              setMode(mode === 'login' ? 'register' : 'login');
+              setError('');
+              setMessage('');
+            }}
+          >
+            {mode === 'login' ? "No tens compte? Registra't" : "Ja tens compte? Inicia sessió"}
+          </button>
+          
+          {mode === 'reset' && (
+            <button style={{...secondaryBtnStyle, marginTop: '15px'}} onClick={() => { setMode('login'); setError(''); }}>
+              Torna al Login
+            </button>
+          )}
         </div>
 
-        <button onClick={handleGoogle} className="login-btn" style={{ background: '#ffffff', color: '#444', border: '1px solid #ddd', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
-          <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/0/google.svg" alt="Google" style={{ width: '18px' }} />
-          CONTINUAR AMB GOOGLE
-        </button>
-
-        <div style={{ textAlign: 'center', marginTop: '2rem', paddingTop: '1rem', borderTop: '1px solid var(--brand-light)' }}>
-          <button 
-            onClick={() => setIsRegister(!isRegister)}
-            style={{ background: 'none', border: 'none', color: 'var(--brand-medium)', cursor: 'pointer', fontWeight: '600' }}
-          >
-            {isRegister ? 'Ja tens compte? Inicia sessió' : 'No tens compte? Registra\'t aquí'}
-          </button>
+        {/* FOOTER */}
+        <div style={{ marginTop: '40px', textAlign: 'center', fontSize: '0.8rem', color: colors.textLight }}>
+          &copy; {new Date().getFullYear()} Campus Serra - Gestió Educativa Premium
+          <br />
+          Suport: <a href={`mailto:${APP_CONFIG?.adminEmail}`} style={{ color: colors.primary, textDecoration: 'none', fontWeight: '600' }}>{APP_CONFIG?.adminEmail}</a>
         </div>
       </div>
     </div>

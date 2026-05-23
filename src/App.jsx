@@ -15,7 +15,7 @@ const APP_CONFIG = {
     "1r ESO", "2n ESO", "3r ESO", "4t ESO A", "4t ESO B", 
     "1r BATX CCSS", "1r BATX CIEN.", "2n BATX CCSS", "2n BATX CIEN"
   ],
-  tipusIcons: { 'Teoria': '📚', 'Exercici': '✍️', 'Vídeo': '🎥', 'Examen': '🏁' }
+  tipusIcons: { 'Teoria': '📚', 'Exercici': '✍️', 'Vídeo': '🎥', 'Examen': '🏁', 'Tasca': '📂' }
 };
 
 export default function App() {
@@ -31,22 +31,20 @@ export default function App() {
   }, []);
 
   if (loading) return (
-    <div className="auth-page">
-      <div className="auth-card" style={{ textAlign: 'center' }}>
-        <p>Carregant sistema...</p>
+    <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f8fafc', fontFamily: 'sans-serif' }}>
+      <div style={{ textAlign: 'center' }}>
+        <p style={{ color: '#64748b' }}>Carregant aplicació...</p>
       </div>
     </div>
   );
 
-  return (
-    <>
-      {!user ? (
-        <LoginPage logoImg={logoImg} APP_CONFIG={APP_CONFIG} />
-      ) : user.email === APP_CONFIG.adminEmail ? (
-        <AdminPanel logoImg={logoImg} APP_CONFIG={APP_CONFIG} />
-      ) : (
-        <StudentDashboard user={user} logoImg={logoImg} APP_CONFIG={APP_CONFIG} />
-      )}
-    </>
-  );
+  if (!user) {
+    return <LoginPage APP_CONFIG={APP_CONFIG} logoImg={logoImg} />;
+  }
+
+  if (user.email === APP_CONFIG.adminEmail) {
+    return <AdminPanel APP_CONFIG={APP_CONFIG} logoImg={logoImg} />;
+  }
+
+  return <StudentDashboard user={user} APP_CONFIG={APP_CONFIG} logoImg={logoImg} />;
 }
