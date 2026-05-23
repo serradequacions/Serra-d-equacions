@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { db, auth } from '../firebase';
 import { 
   collection, query, where, onSnapshot, orderBy, doc, getDoc, addDoc, serverTimestamp 
@@ -27,6 +27,7 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState('');
   const [entregaActual, setEntregaActual] = useState(null);
+  const fileInputRef = useRef(null);
 
   const WORKER_URL = 'https://brevo-proxy.serradequacions.workers.dev';
 
@@ -158,8 +159,19 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
         }
       });
       return () => unsub();
+    } else {
+      setEntregaActual(null);
     }
   }, [selectedMaterial, user]);
+
+  // --- NETEJA D'ESTAT DE PUJADA EN CANVIAR DE MATERIAL ---
+  useEffect(() => {
+    setUploadStatus('');
+    setIsUploading(false);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  }, [selectedMaterial?.id]);
 
   // --- LÒGICA PER OBRIR FITXERS SENSE ERROR DE CHROME ---
   const handleOpenFile = (url) => {
@@ -191,12 +203,32 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
   };
 
   // --- LÒGICA DE PUJADA A CLOUDINARY ---
+  const resetUploadInput = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
   const handleUploadCloudinary = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+    const input = e.target;
+    const file = input?.files?.[0];
+    if (!file || isUploading) return;
+
+    if (!selectedMaterial?.id) {
+      setUploadStatus('❌ Error: no s\'ha pogut identificar la tasca.');
+      resetUploadInput();
+      return;
+    }
+
+    if (!APP_CONFIG?.cloudName || !APP_CONFIG?.uploadPreset) {
+      setUploadStatus('❌ Error: configuració de pujada no disponible.');
+      resetUploadInput();
+      return;
+    }
 
     if (file.size > 50 * 1024 * 1024) {
-      alert("El fitxer és massa gran. El límit són 50MB.");
+      setUploadStatus('❌ El fitxer és massa gran. El límit són 50MB.');
+      resetUploadInput();
       return;
     }
 
@@ -237,11 +269,15 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
       
     } catch (err) {
       console.error("Error en el procés d'entrega:", err);
-      setUploadStatus(`❌ Error: ${err.message}`);
+      const missatge = err?.message || "No s'ha pogut completar l'entrega. Torna-ho a provar.";
+      setUploadStatus(`❌ Error: ${missatge}`);
     } finally {
       setIsUploading(false);
+      resetUploadInput();
     }
   };
+
+  const teNota = entregaActual?.nota !== undefined && entregaActual?.nota !== null;
 
   // --- PANTALLA DE CÀRREGA ---
   if (loading) return (
@@ -473,11 +509,23 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
                         <div style={{ fontSize: '1rem', fontWeight: '500', marginTop: '10px', opacity: 0.7 }}>Admet PDF, ZIP, DOCX i Imatges</div>
                       </div>
                     )}
-                    <input type="file" hidden onChange={handleUploadCloudinary} disabled={isUploading} />
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      hidden
+                      onChange={handleUploadCloudinary}
+                      disabled={isUploading}
+                    />
                   </label>
                   
-                  {uploadStatus.includes('✅') && (
+                  {uploadStatus.includes('✅') && !isUploading && (
                     <div style={{ ...statusText(colors.success), backgroundColor: '#f0fdf4', padding: '15px', borderRadius: '15px', marginTop: '20px', border: `1px solid ${colors.success}` }}>
+                      {uploadStatus}
+                    </div>
+                  )}
+
+                  {uploadStatus.startsWith('❌') && !isUploading && (
+                    <div style={{ ...statusText(colors.danger), backgroundColor: '#fef2f2', padding: '15px', borderRadius: '15px', marginTop: '20px', border: `1px solid ${colors.danger}` }}>
                       {uploadStatus}
                     </div>
                   )}
@@ -486,9 +534,16 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
                 {entregaActual && (
                   <div style={confirmedSubmissionStyle(colors)}>
                     <div style={{ flex: 1 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: colors.success }}></div>
-                        <div style={{ fontWeight: '900', fontSize: '0.8rem', color: colors.success, textTransform: 'uppercase' }}>Lliurat correctament</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: colors.success }}></div>
+                          <div style={{ fontWeight: '900', fontSize: '0.8rem', color: colors.success, textTransform: 'uppercase' }}>Lliurat correctament</div>
+                        </div>
+                        {teNota && (
+                          <span style={notaBadgeStyle(colors)}>
+                            Qualificat: {entregaActual.nota}/10
+                          </span>
+                        )}
                       </div>
                       <div style={{ fontSize: '1.1rem', color: colors.textDark, marginTop: '10px', fontWeight: '800' }}>{entregaActual.fileName}</div>
                       <div style={{ fontSize: '0.85rem', color: colors.textLight, marginTop: '5px', fontWeight: '600' }}>
@@ -754,6 +809,20 @@ const viewBtnStyle = (c) => ({
   fontSize: '1rem', color: c.primary, fontWeight: '900', textDecoration: 'none',
   padding: '14px 28px', border: `2.5px solid ${c.primary}`, borderRadius: '16px', 
   backgroundColor: '#fff', cursor: 'pointer'
+});
+
+const notaBadgeStyle = (c) => ({
+  fontSize: '0.75rem',
+  fontWeight: '900',
+  textTransform: 'uppercase',
+  letterSpacing: '0.6px',
+  padding: '7px 16px',
+  borderRadius: '12px',
+  backgroundColor: '#eff6ff',
+  color: c.primaryDark,
+  border: `1.5px solid ${c.primary}`,
+  boxShadow: '0 4px 12px rgba(37, 99, 235, 0.12)',
+  whiteSpace: 'nowrap'
 });
 
 const emptyState = (c) => ({
