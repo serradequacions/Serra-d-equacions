@@ -83,6 +83,12 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
     return false;
   };
 
+  const getUrlArxiu = (tramesa) => tramesa?.urlCloudinary || tramesa?.fileUrl || '';
+
+  const getCursAlumne = (tramesa) => tramesa?.curs || tramesa?.alumneCurs || '—';
+
+  const getNomAlumne = (tramesa) => tramesa?.alumneNom || 'Alumne sense nom';
+
   const formatFirebaseDate = (data) => {
     if (!data) return '—';
     try {
@@ -135,12 +141,16 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
   }, []);
 
   // --- LÒGICA PER GUARDAR NOTA ---
-  const handleGuardarNota = async (id, valor) => {
+  const handleGuardarNota = async (tramesaId, valor) => {
+    if (!tramesaId) return;
     try {
-      const notaNum = parseFloat(valor);
-      const updateData = (valor === "" || isNaN(notaNum)) ? { nota: null } : { nota: notaNum };
-      await updateDoc(doc(db, "trameses", id), updateData);
-    } catch (e) { console.error("Error guardant nota:", e); }
+      const nota = parseFloat(valor);
+      const updateData = (valor === '' || Number.isNaN(nota)) ? { nota: null } : { nota };
+      await updateDoc(doc(db, 'trameses', tramesaId), updateData);
+    } catch (e) {
+      console.error('Error guardant nota:', e);
+      alert('No s\'ha pogut guardar la nota. Torna-ho a provar.');
+    }
   };
 
   // --- FIX OBERTURA FITXERS ---
@@ -489,53 +499,57 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
                       </td>
                     </tr>
                   ) : (
-                    entreguesPerRevisio.map((t) => (
-                      <tr key={t.id} style={{ borderBottom: `1px solid ${colors.border}` }}>
-                        <td style={{ padding: '14px 15px', fontWeight: '700' }}>
-                          {t.alumneNom || 'Alumne sense nom'}
-                        </td>
-                        <td style={{ padding: '14px 15px', color: colors.primary, fontWeight: '600', fontSize: '0.85rem' }}>
-                          {t.curs || '—'}
-                        </td>
-                        <td style={{ padding: '14px 15px', color: colors.textLight, fontSize: '0.85rem', whiteSpace: 'nowrap' }}>
-                          {formatFirebaseDate(t.data)}
-                        </td>
-                        <td style={{ padding: '14px 15px' }}>
-                          {t.fileUrl ? (
-                            <button
-                              type="button"
-                              onClick={() => obrirFitxer(t.fileUrl)}
-                              style={revisarBtnStyle(colors)}
-                              title={t.fileName || 'Obrir lliurament'}
-                            >
-                              👁️ {t.fileName ? 'Veure' : 'Arxiu'}
-                            </button>
-                          ) : (
-                            <span style={{ color: colors.textLight, fontSize: '0.8rem' }}>Sense arxiu</span>
-                          )}
-                        </td>
-                        <td style={{ padding: '14px 15px' }}>
-                          <input
-                            type="number"
-                            step="0.1"
-                            min="0"
-                            max="10"
-                            placeholder="-"
-                            defaultValue={t.nota ?? ''}
-                            key={`nota-revisio-${t.id}-${t.nota ?? 'buida'}`}
-                            onBlur={(e) => handleGuardarNota(t.id, e.target.value)}
-                            style={{
-                              width: '70px',
-                              padding: '8px',
-                              borderRadius: '8px',
-                              border: `1px solid ${colors.border}`,
-                              textAlign: 'center',
-                              fontWeight: '700'
-                            }}
-                          />
-                        </td>
-                      </tr>
-                    ))
+                    entreguesPerRevisio.map((tramesa) => {
+                      const urlArxiu = getUrlArxiu(tramesa);
+                      return (
+                        <tr key={tramesa.id} style={{ borderBottom: `1px solid ${colors.border}` }}>
+                          <td style={{ padding: '14px 15px', fontWeight: '700' }}>
+                            {getNomAlumne(tramesa)}
+                          </td>
+                          <td style={{ padding: '14px 15px', color: colors.primary, fontWeight: '600', fontSize: '0.85rem' }}>
+                            {getCursAlumne(tramesa)}
+                          </td>
+                          <td style={{ padding: '14px 15px', color: colors.textLight, fontSize: '0.85rem', whiteSpace: 'nowrap' }}>
+                            {formatFirebaseDate(tramesa.data)}
+                          </td>
+                          <td style={{ padding: '14px 15px' }}>
+                            {urlArxiu ? (
+                              <a
+                                href={urlArxiu}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={linkArxiuStyle(colors)}
+                                title={tramesa.fileName || 'Obrir lliurament a Cloudinary'}
+                              >
+                                {tramesa.fileName || 'Veure arxiu'}
+                              </a>
+                            ) : (
+                              <span style={{ color: colors.textLight, fontSize: '0.8rem' }}>Sense arxiu</span>
+                            )}
+                          </td>
+                          <td style={{ padding: '14px 15px' }}>
+                            <input
+                              type="number"
+                              step="0.1"
+                              min="0"
+                              max="10"
+                              placeholder="-"
+                              defaultValue={tramesa.nota ?? ''}
+                              key={`nota-revisio-${tramesa.id}-${tramesa.nota ?? 'buida'}`}
+                              onBlur={(e) => handleGuardarNota(tramesa.id, e.target.value)}
+                              style={{
+                                width: '70px',
+                                padding: '8px',
+                                borderRadius: '8px',
+                                border: `1px solid ${colors.border}`,
+                                textAlign: 'center',
+                                fontWeight: '700'
+                              }}
+                            />
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
@@ -573,6 +587,14 @@ const cursHeader = (c) => ({ padding: '15px 20px', backgroundColor: '#f8fafc', d
 const materialRow = (c) => ({ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: `1px solid ${c.border}`, gap: '15px' });
 const counterBadge = { backgroundColor: '#ef4444', color: 'white', padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', marginLeft: '8px' };
 const revisarBtnStyle = (c) => ({ backgroundColor: '#eff6ff', color: c.primary, padding: '8px 14px', borderRadius: '8px', textDecoration: 'none', fontSize: '0.8rem', fontWeight: '700', border: `1px solid ${c.accent}`, cursor: 'pointer', whiteSpace: 'nowrap' });
+
+const linkArxiuStyle = (c) => ({
+  color: c.primary,
+  fontWeight: '700',
+  fontSize: '0.85rem',
+  textDecoration: 'underline',
+  textUnderlineOffset: '3px'
+});
 
 const modalOverlayStyle = {
   position: 'fixed',

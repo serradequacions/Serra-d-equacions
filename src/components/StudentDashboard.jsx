@@ -255,9 +255,11 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
         alumneNom: studentData?.nom || user.displayName || user.email || "Alumne",
         alumneId: user.uid,
         curs: studentData?.curs || "Curs no especificat",
+        alumneCurs: studentData?.curs || "Curs no especificat",
         materialTitol: selectedMaterial.titol || "Sense títol",
         materialId: selectedMaterial.id,
         fileUrl: data.secure_url,
+        urlCloudinary: data.secure_url,
         fileName: file.name,
         data: serverTimestamp()
       };
