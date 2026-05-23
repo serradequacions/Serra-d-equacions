@@ -27,6 +27,18 @@ const normalitzarUrlCloudinary = (url, fileName = '') => {
 const obtenirUrlCloudinary = (tramesa) =>
   normalitzarUrlCloudinary(tramesa?.urlCloudinary || tramesa?.fileUrl || '', tramesa?.fileName);
 
+const teNotaValida = (entrega) => {
+  if (!entrega || entrega.nota === undefined || entrega.nota === null) return false;
+  const nota = parseFloat(entrega.nota);
+  return !Number.isNaN(nota);
+};
+
+const esEntregaCompletada = (entrega) => {
+  if (!entrega) return false;
+  if (entrega.estat === 'completada') return true;
+  return teNotaValida(entrega);
+};
+
 /**
  * StudentDashboard.jsx - VERSIÓ INTEGRAL REPARADA (+500 línies)
  * - Fix: Obertura segura de fitxers (CORS/Chrome Error).
@@ -70,10 +82,15 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
 
   const esTasca = (m) => m.tipus?.toLowerCase().includes('tasca');
 
+  const obtenirEntregaPerMaterial = (materialId) =>
+    entregasAlumne.find((e) => e.materialId === materialId);
+
+  const esMaterialCompletat = (materialId) =>
+    esEntregaCompletada(obtenirEntregaPerMaterial(materialId));
+
   const progrés = useMemo(() => {
     const tasques = materials.filter(esTasca);
-    const idsEntregats = new Set(entregasAlumne.map((e) => e.materialId));
-    const completades = tasques.filter((t) => idsEntregats.has(t.id)).length;
+    const completades = tasques.filter((t) => esEntregaCompletada(obtenirEntregaPerMaterial(t.id))).length;
     const total = tasques.length;
     const percent = total > 0 ? Math.round((completades / total) * 100) : 0;
 
@@ -81,7 +98,7 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
       const tema = t.tema || 'Sense tema';
       if (!acc[tema]) acc[tema] = { total: 0, fetes: 0 };
       acc[tema].total += 1;
-      if (idsEntregats.has(t.id)) acc[tema].fetes += 1;
+      if (esEntregaCompletada(obtenirEntregaPerMaterial(t.id))) acc[tema].fetes += 1;
       return acc;
     }, {});
 
@@ -286,6 +303,7 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
         materialId: selectedMaterial.id,
         urlCloudinary,
         fileName: file.name,
+        estat: 'pendent_revisio',
         data: serverTimestamp(),
         dataLliurament: serverTimestamp()
       };
@@ -305,7 +323,49 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
     }
   };
 
-  const teNota = entregaActual?.nota !== undefined && entregaActual?.nota !== null;
+  const teNota = teNotaValida(entregaActual);
+  const tascaCompletada = esEntregaCompletada(entregaActual);
+
+  const renderFilaMaterial = (m, colors, APP_CONFIG) => {
+    const entrega = obtenirEntregaPerMaterial(m.id);
+    const completada = esTasca(m) && esEntregaCompletada(entrega);
+    const lliuradaPendent = esTasca(m) && entrega && !completada;
+
+    return (
+      <div
+        key={m.id}
+        onClick={() => { setSelectedMaterial(m); setView('detall'); }}
+        style={completada ? materialRowCompletadaStyle(colors) : materialRowStyle(colors)}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '22px' }}>
+          <span style={{ fontSize: '2rem' }}>{APP_CONFIG.tipusIcons[m.tipus] || '📄'}</span>
+          <div>
+            <div style={{ fontWeight: '800', color: colors.textDark, fontSize: '1.15rem' }}>{m.titol}</div>
+            <div style={{ fontSize: '0.8rem', color: colors.textLight, textTransform: 'uppercase', fontWeight: '800', marginTop: '4px' }}>
+              {m.tipus}
+              {completada && (
+                <span style={{ marginLeft: '10px', color: colors.success }}>· Tasca Completada</span>
+              )}
+              {lliuradaPendent && (
+                <span style={{ marginLeft: '10px', color: colors.warning }}>· Pendent de revisió</span>
+              )}
+              {esTasca(m) && !entrega && (
+                <span style={{ marginLeft: '10px', color: colors.warning }}>· Pendent</span>
+              )}
+            </div>
+            {completada && teNotaValida(entrega) && (
+              <div style={{ fontSize: '0.8rem', color: colors.primaryDark, fontWeight: '800', marginTop: '6px' }}>
+                Nota: {entrega.nota}/10
+              </div>
+            )}
+          </div>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <span style={dateStyle}>{m.data?.toDate().toLocaleDateString()}</span>
+        </div>
+      </div>
+    );
+  };
 
   // --- PANTALLA DE CÀRREGA ---
   if (loading) return (
@@ -372,7 +432,7 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
                     <div style={progressStatsRowStyle}>
                       <div style={progressStatBoxStyle(colors, colors.primary)}>
                         <div style={progressStatValueStyle}>{progrés.completades}</div>
-                        <div style={progressStatLabelStyle(colors)}>Tasques lliurades</div>
+                        <div style={progressStatLabelStyle(colors)}>Tasques completades</div>
                       </div>
                       <div style={progressStatBoxStyle(colors, colors.warning)}>
                         <div style={progressStatValueStyle}>{progrés.total - progrés.completades}</div>
@@ -445,35 +505,34 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
                   acc[m.tema].push(m);
                   return acc;
                 }, {})
-              ).map(([tema, items]) => (
-                <div key={tema} style={{ marginBottom: '55px' }}>
-                  <h3 style={temaHeader(colors)}>{tema}</h3>
-                  {items.map(m => {
-                    const lliurada = entregasAlumne.some((e) => e.materialId === m.id);
-                    return (
-                      <div key={m.id} onClick={() => { setSelectedMaterial(m); setView('detall'); }} style={materialRowStyle(colors)}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '22px' }}>
-                          <span style={{ fontSize: '2rem' }}>{APP_CONFIG.tipusIcons[m.tipus] || '📄'}</span>
-                          <div>
-                            <div style={{ fontWeight: '800', color: colors.textDark, fontSize: '1.15rem' }}>{m.titol}</div>
-                            <div style={{ fontSize: '0.8rem', color: colors.textLight, textTransform: 'uppercase', fontWeight: '800', marginTop: '4px' }}>
-                              {m.tipus}
-                              {esTasca(m) && (
-                                <span style={{ marginLeft: '10px', color: lliurada ? colors.success : colors.warning }}>
-                                  {lliurada ? '· Lliurada' : '· Pendent'}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                        <div style={{ textAlign: 'right' }}>
-                          <span style={dateStyle}>{m.data?.toDate().toLocaleDateString()}</span>
-                        </div>
+              ).map(([tema, items]) => {
+                const tasques = items.filter(esTasca);
+                const altresMaterials = items.filter((m) => !esTasca(m));
+                const tasquesPendents = tasques.filter((m) => !esMaterialCompletat(m.id));
+                const tasquesCompletades = tasques.filter((m) => esMaterialCompletat(m.id));
+
+                return (
+                  <div key={tema} style={{ marginBottom: '55px' }}>
+                    <h3 style={temaHeader(colors)}>{tema}</h3>
+
+                    {altresMaterials.map((m) => renderFilaMaterial(m, colors, APP_CONFIG))}
+
+                    {tasquesPendents.length > 0 && (
+                      <div style={{ marginTop: altresMaterials.length > 0 ? '25px' : 0, marginBottom: '25px' }}>
+                        <div style={subSectionLabelStyle(colors)}>Tasques pendents de revisió</div>
+                        {tasquesPendents.map((m) => renderFilaMaterial(m, colors, APP_CONFIG))}
                       </div>
-                    );
-                  })}
-                </div>
-              ))
+                    )}
+
+                    {tasquesCompletades.length > 0 && (
+                      <div style={{ marginTop: '25px' }}>
+                        <div style={subSectionLabelStyle(colors, colors.success)}>Tasques completades</div>
+                        {tasquesCompletades.map((m) => renderFilaMaterial(m, colors, APP_CONFIG))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })
             )}
           </div>
         )}
@@ -516,6 +575,19 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
 
             {selectedMaterial.tipus?.toLowerCase().includes('tasca') && (
               <div style={submissionSectionStyle(colors)}>
+                {tascaCompletada && (
+                  <div style={tascaCompletadaBannerStyle(colors)}>
+                    <span style={{ fontSize: '1.5rem' }}>✅</span>
+                    <div>
+                      <div style={{ fontWeight: '900', fontSize: '1.1rem', color: colors.success }}>Tasca Completada</div>
+                      <div style={{ fontSize: '0.9rem', color: colors.textLight, marginTop: '4px', fontWeight: '600' }}>
+                        El professor ha revisat i qualificat el teu lliurament.
+                        {teNota && ` La teva nota és ${entregaActual.nota}/10.`}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
                   <h3 style={{ fontSize: '1.6rem', margin: 0, fontWeight: '900' }}>El teu lliurament</h3>
                   <div style={{ fontSize: '0.85rem', color: colors.textLight, fontWeight: '700', backgroundColor: '#fff', padding: '5px 12px', borderRadius: '8px', border: `1px solid ${colors.border}` }}>
@@ -524,7 +596,7 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
                 </div>
                 
                 <div style={{ marginBottom: '35px' }}>
-                  <label style={uploadDropzoneStyle(isUploading, colors)}>
+                  <label style={uploadDropzoneStyle(isUploading, colors, tascaCompletada)}>
                     {isUploading ? (
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>
                         <div className="spinner-white"></div>
@@ -542,9 +614,14 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
                       type="file"
                       hidden
                       onChange={handleUploadCloudinary}
-                      disabled={isUploading}
+                      disabled={isUploading || tascaCompletada}
                     />
                   </label>
+                  {tascaCompletada && (
+                    <p style={{ textAlign: 'center', color: colors.textLight, fontSize: '0.9rem', marginTop: '12px', fontWeight: '600' }}>
+                      Aquesta tasca ja està tancada. No cal tornar a pujar el fitxer.
+                    </p>
+                  )}
                   
                   {uploadStatus.includes('✅') && !isUploading && (
                     <div style={{ ...statusText(colors.success), backgroundColor: '#f0fdf4', padding: '15px', borderRadius: '15px', marginTop: '20px', border: `1px solid ${colors.success}` }}>
@@ -560,12 +637,14 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
                 </div>
 
                 {entregaActual && (
-                  <div style={confirmedSubmissionStyle(colors)}>
+                  <div style={tascaCompletada ? confirmedSubmissionCompletadaStyle(colors) : confirmedSubmissionStyle(colors)}>
                     <div style={{ flex: 1 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                           <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: colors.success }}></div>
-                          <div style={{ fontWeight: '900', fontSize: '0.8rem', color: colors.success, textTransform: 'uppercase' }}>Lliurat correctament</div>
+                          <div style={{ fontWeight: '900', fontSize: '0.8rem', color: colors.success, textTransform: 'uppercase' }}>
+                            {tascaCompletada ? 'Tasca Completada' : 'Lliurat correctament'}
+                          </div>
                         </div>
                         {teNota && (
                           <span style={notaBadgeStyle(colors)}>
@@ -793,6 +872,35 @@ const materialRowStyle = (c) => ({
   boxShadow: '0 6px 15px rgba(0,0,0,0.01)'
 });
 
+const materialRowCompletadaStyle = (c) => ({
+  ...materialRowStyle(c),
+  backgroundColor: '#f0fdf4',
+  border: `2px solid ${c.success}`,
+  boxShadow: '0 8px 20px rgba(16, 185, 129, 0.1)'
+});
+
+const subSectionLabelStyle = (c, accent = c.primary) => ({
+  fontSize: '0.75rem',
+  textTransform: 'uppercase',
+  fontWeight: '900',
+  letterSpacing: '1.5px',
+  color: accent,
+  marginBottom: '18px',
+  paddingLeft: '5px'
+});
+
+const tascaCompletadaBannerStyle = (c) => ({
+  display: 'flex',
+  alignItems: 'center',
+  gap: '18px',
+  padding: '22px 28px',
+  borderRadius: '20px',
+  backgroundColor: '#f0fdf4',
+  border: `2px solid ${c.success}`,
+  marginBottom: '35px',
+  boxShadow: '0 8px 20px rgba(16, 185, 129, 0.08)'
+});
+
 const backBtnStyle = (c) => ({
   background: 'none', border: 'none', color: c.textLight, cursor: 'pointer',
   fontWeight: '800', marginBottom: '40px', fontSize: '1.1rem', padding: 0, 
@@ -815,12 +923,13 @@ const submissionSectionStyle = (c) => ({
   marginTop: '70px', borderTop: `2px solid ${c.border}`, paddingTop: '60px'
 });
 
-const uploadDropzoneStyle = (loading, c) => ({
+const uploadDropzoneStyle = (loading, c, desactivat = false) => ({
   display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', 
-  padding: '70px 50px', textAlign: 'center', border: `4px dashed ${c.primary}`, 
-  borderRadius: '35px', cursor: loading ? 'not-allowed' : 'pointer', 
-  color: loading ? '#fff' : c.primary, fontWeight: '900', 
-  backgroundColor: loading ? c.primary : '#eff6ff'
+  padding: '70px 50px', textAlign: 'center', border: `4px dashed ${desactivat ? c.border : c.primary}`, 
+  borderRadius: '35px', cursor: loading || desactivat ? 'not-allowed' : 'pointer', 
+  color: loading ? '#fff' : desactivat ? c.textLight : c.primary, fontWeight: '900', 
+  backgroundColor: loading ? c.primary : desactivat ? '#f1f5f9' : '#eff6ff',
+  opacity: desactivat && !loading ? 0.75 : 1
 });
 
 const statusText = (color) => ({ 
@@ -831,6 +940,12 @@ const confirmedSubmissionStyle = (c) => ({
   display: 'flex', alignItems: 'center', gap: '35px', padding: '30px 40px',
   borderRadius: '28px', border: `2px solid ${c.success}`, backgroundColor: '#f0fdf4', 
   marginTop: '35px', boxShadow: '0 8px 20px rgba(16, 185, 129, 0.08)'
+});
+
+const confirmedSubmissionCompletadaStyle = (c) => ({
+  ...confirmedSubmissionStyle(c),
+  border: `2px solid ${c.primary}`,
+  backgroundColor: '#eff6ff'
 });
 
 const viewBtnStyle = (c) => ({

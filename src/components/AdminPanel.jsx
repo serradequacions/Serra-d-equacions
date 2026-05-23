@@ -277,7 +277,10 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
     if (valorNet === '') {
       if (notaAnterior === null || notaAnterior === undefined) return;
       try {
-        await updateDoc(doc(db, 'trameses', tramesa.id), { nota: null });
+        await updateDoc(doc(db, 'trameses', tramesa.id), {
+          nota: null,
+          estat: 'pendent_revisio'
+        });
       } catch (e) {
         console.error('Error esborrant la nota:', e);
         alert("No s'ha pogut actualitzar la nota. Torna-ho a provar.");
@@ -297,7 +300,10 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
     }
 
     try {
-      await updateDoc(doc(db, 'trameses', tramesa.id), { nota });
+      await updateDoc(doc(db, 'trameses', tramesa.id), {
+        nota,
+        estat: 'completada'
+      });
 
       const correuAlumne = await obtenirEmailAlumne(tramesa.alumneId);
       const titolTasca = tramesa.materialTitol || materialRevisio?.titol || 'Tasca';
