@@ -5,6 +5,28 @@ import {
 } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 
+const EXTENSIONS_IMATGE = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg', 'heic'];
+
+const obtenirTipusRecursCloudinary = (fileName) => {
+  const ext = (fileName || '').split('.').pop()?.toLowerCase() || '';
+  return EXTENSIONS_IMATGE.includes(ext) ? 'image' : 'raw';
+};
+
+const normalitzarUrlCloudinary = (url, fileName = '') => {
+  if (!url || typeof url !== 'string') return '';
+  const tipus = obtenirTipusRecursCloudinary(fileName);
+  if (tipus === 'raw' && url.includes('/image/upload/')) {
+    return url.replace('/image/upload/', '/raw/upload/');
+  }
+  if (tipus === 'image' && url.includes('/raw/upload/')) {
+    return url.replace('/raw/upload/', '/image/upload/');
+  }
+  return url;
+};
+
+const obtenirUrlCloudinary = (tramesa) =>
+  normalitzarUrlCloudinary(tramesa?.urlCloudinary || tramesa?.fileUrl || '', tramesa?.fileName);
+
 /**
  * StudentDashboard.jsx - VERSIÓ INTEGRAL REPARADA (+500 línies)
  * - Fix: Obertura segura de fitxers (CORS/Chrome Error).
@@ -235,19 +257,23 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
     setIsUploading(true);
     setUploadStatus('Preparant enviament...');
 
+    const tipusRecurs = obtenirTipusRecursCloudinary(file.name);
     const formData = new FormData();
     formData.append('file', file);
     formData.append('upload_preset', APP_CONFIG.uploadPreset);
     formData.append('cloud_name', APP_CONFIG.cloudName);
 
     try {
-      const res = await fetch(`https://api.cloudinary.com/v1_1/${APP_CONFIG.cloudName}/auto/upload`, {
-        method: 'POST',
-        body: formData
-      });
+      const res = await fetch(
+        `https://api.cloudinary.com/v1_1/${APP_CONFIG.cloudName}/${tipusRecurs}/upload`,
+        { method: 'POST', body: formData }
+      );
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error?.message || "Error Cloudinary");
+
+      const urlCloudinary = normalitzarUrlCloudinary(data.secure_url, file.name);
+      if (!urlCloudinary) throw new Error('Cloudinary no ha retornat una URL vàlida.');
 
       setUploadStatus('Finalitzant entrega...');
 
@@ -258,8 +284,7 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
         alumneCurs: studentData?.curs || "Curs no especificat",
         materialTitol: selectedMaterial.titol || "Sense títol",
         materialId: selectedMaterial.id,
-        fileUrl: data.secure_url,
-        urlCloudinary: data.secure_url,
+        urlCloudinary,
         fileName: file.name,
         data: serverTimestamp(),
         dataLliurament: serverTimestamp()
@@ -553,7 +578,7 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
                         Data: {entregaActual.data?.toDate().toLocaleString('ca-ES')}
                       </div>
                     </div>
-                    <button onClick={() => handleOpenFile(entregaActual.fileUrl)} style={viewBtnStyle(colors)}>Revisar Enviament</button>
+                    <button onClick={() => handleOpenFile(obtenirUrlCloudinary(entregaActual))} style={viewBtnStyle(colors)}>Revisar Enviament</button>
                   </div>
                 )}
               </div>

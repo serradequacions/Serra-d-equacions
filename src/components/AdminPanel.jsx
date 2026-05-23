@@ -16,6 +16,28 @@ import {
   updateDoc
 } from 'firebase/firestore';
 
+const EXTENSIONS_IMATGE = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg', 'heic'];
+
+const obtenirTipusRecursCloudinary = (fileName) => {
+  const ext = (fileName || '').split('.').pop()?.toLowerCase() || '';
+  return EXTENSIONS_IMATGE.includes(ext) ? 'image' : 'raw';
+};
+
+const normalitzarUrlCloudinary = (url, fileName = '') => {
+  if (!url || typeof url !== 'string') return '';
+  const tipus = obtenirTipusRecursCloudinary(fileName);
+  if (tipus === 'raw' && url.includes('/image/upload/')) {
+    return url.replace('/image/upload/', '/raw/upload/');
+  }
+  if (tipus === 'image' && url.includes('/raw/upload/')) {
+    return url.replace('/raw/upload/', '/image/upload/');
+  }
+  return url;
+};
+
+const obtenirUrlCloudinaryTramesa = (tramesa) =>
+  normalitzarUrlCloudinary(tramesa?.urlCloudinary || tramesa?.fileUrl || '', tramesa?.fileName);
+
 function TaulaRevisioTrameses({ entregues, colors, onGuardarNota }) {
   if (entregues.length === 0) {
     return (
@@ -36,7 +58,7 @@ function TaulaRevisioTrameses({ entregues, colors, onGuardarNota }) {
   }
 
   return entregues.map((tramesa) => {
-    const urlFitxer = tramesa.urlCloudinary || tramesa.fileUrl || '';
+    const urlCloudinary = obtenirUrlCloudinaryTramesa(tramesa);
     const timestamp = tramesa.dataLliurament || tramesa.data;
 
     return (
@@ -53,9 +75,9 @@ function TaulaRevisioTrameses({ entregues, colors, onGuardarNota }) {
             : 'Sense data'}
         </td>
         <td style={{ padding: '14px 15px' }}>
-          {urlFitxer ? (
+          {urlCloudinary ? (
             <a
-              href={urlFitxer}
+              href={urlCloudinary}
               target="_blank"
               rel="noopener noreferrer"
               style={{ color: '#2563eb', fontWeight: 'bold', textDecoration: 'underline' }}
@@ -427,7 +449,7 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
                     </tr>
                   ) : (
                     trameses.map((tramesa) => {
-                      const urlFitxer = tramesa.urlCloudinary || tramesa.fileUrl || '';
+                      const urlCloudinary = obtenirUrlCloudinaryTramesa(tramesa);
                       return (
                         <tr key={tramesa.id} style={{ borderBottom: `1px solid ${colors.border}` }}>
                           <td style={{ padding: '15px' }}>
@@ -436,8 +458,15 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
                           </td>
                           <td style={{ padding: '15px' }}>{tramesa.materialTitol || '—'}</td>
                           <td style={{ padding: '15px' }}>
-                            {urlFitxer ? (
-                              <button type="button" onClick={() => obrirFitxer(urlFitxer)} style={revisarBtnStyle(colors)}>👁️ Veure</button>
+                            {urlCloudinary ? (
+                              <a
+                                href={urlCloudinary}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{ color: '#2563eb', fontWeight: 'bold', textDecoration: 'underline' }}
+                              >
+                                Veure Fitxer
+                              </a>
                             ) : (
                               <span style={{ color: colors.textLight, fontSize: '0.8rem' }}>Sense arxiu</span>
                             )}
