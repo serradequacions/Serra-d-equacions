@@ -12,6 +12,7 @@ import {
   setDoc,
   onSnapshot,
   getDocs,
+  getDoc,
   where,
   updateDoc
 } from 'firebase/firestore';
@@ -97,7 +98,7 @@ function TaulaRevisioTrameses({ entregues, colors, onGuardarNota }) {
             placeholder="-"
             defaultValue={tramesa.nota ?? ''}
             key={`nota-revisio-${tramesa.id}-${tramesa.nota ?? 'buida'}`}
-            onBlur={(e) => onGuardarNota(tramesa.id, e.target.value)}
+            onBlur={(e) => onGuardarNota(tramesa, e.target.value)}
             style={{
               width: '70px',
               padding: '8px',
@@ -209,12 +210,104 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
     };
   }, []);
 
-  const handleGuardarNota = async (tramesaId, valor) => {
-    if (!tramesaId) return;
+  const obtenirEmailAlumne = async (alumneId) => {
+    if (!alumneId) return null;
     try {
-      const nota = parseFloat(valor);
-      const updateData = valor === '' || Number.isNaN(nota) ? { nota: null } : { nota };
-      await updateDoc(doc(db, 'trameses', tramesaId), updateData);
+      const snap = await getDoc(doc(db, 'usuaris', alumneId));
+      if (snap.exists()) {
+        return snap.data().email || null;
+      }
+    } catch (e) {
+      console.error('Error obtenint el correu de l\'alumne:', e);
+    }
+    return null;
+  };
+
+  const enviarCorreuNota = async (correuAlumne, nomAlumne, titolTasca, nota) => {
+    if (!correuAlumne) {
+      console.warn('No es pot enviar el correu de nota: l\'alumne no té email registrat.');
+      return;
+    }
+
+    const nom = nomAlumne || 'Alumne';
+    const tasca = titolTasca || 'la teva tasca';
+    const notaText = Number.isInteger(nota) ? String(nota) : String(nota);
+
+    const assumpte = "Nova qualificació disponible a Serra d'Equacions";
+    const contingut = [
+      `Hola <strong>${nom}</strong>,`,
+      '',
+      `El professor ha qualificat la teva tasca <strong>"${tasca}"</strong> amb una nota de <strong>${notaText}/10</strong>.`,
+      '',
+      'Pots entrar al Campus per veure els detalls de la teva entrega i la resta de materials del curs.',
+      '',
+      'Atentament,',
+      "<strong>Equip Serra d'Equacions</strong>"
+    ].join('<br>');
+
+    try {
+      const res = await fetch(WORKER_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          emails: [correuAlumne],
+          tipus: 'nota',
+          titol: assumpte,
+          subject: assumpte,
+          contingut,
+          content: contingut,
+          url: 'https://serradequacions.github.io/Serra-d-equacions/'
+        })
+      });
+
+      if (!res.ok) {
+        console.error('Error del proxy Brevo en enviar correu de nota:', await res.text());
+      }
+    } catch (e) {
+      console.error('Error enviant correu de nota:', e);
+    }
+  };
+
+  const handleGuardarNota = async (tramesa, valor) => {
+    if (!tramesa?.id) return;
+
+    const valorNet = String(valor).trim();
+    const notaAnterior = tramesa.nota ?? null;
+
+    if (valorNet === '') {
+      if (notaAnterior === null || notaAnterior === undefined) return;
+      try {
+        await updateDoc(doc(db, 'trameses', tramesa.id), { nota: null });
+      } catch (e) {
+        console.error('Error esborrant la nota:', e);
+        alert("No s'ha pogut actualitzar la nota. Torna-ho a provar.");
+      }
+      return;
+    }
+
+    const nota = parseFloat(valorNet);
+    if (Number.isNaN(nota)) return;
+
+    const notaPreviaNum = notaAnterior === null || notaAnterior === undefined
+      ? null
+      : parseFloat(notaAnterior);
+
+    if (notaPreviaNum !== null && !Number.isNaN(notaPreviaNum) && notaPreviaNum === nota) {
+      return;
+    }
+
+    try {
+      await updateDoc(doc(db, 'trameses', tramesa.id), { nota });
+
+      const correuAlumne = await obtenirEmailAlumne(tramesa.alumneId);
+      const titolTasca = tramesa.materialTitol || materialRevisio?.titol || 'Tasca';
+
+      await enviarCorreuNota(
+        correuAlumne,
+        tramesa.alumneNom,
+        titolTasca,
+        nota
+      );
     } catch (e) {
       console.error('Error guardant nota:', e);
       alert("No s'ha pogut guardar la nota. Torna-ho a provar.");
@@ -480,7 +573,7 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
                               placeholder="-"
                               defaultValue={tramesa.nota ?? ''}
                               key={`nota-global-${tramesa.id}-${tramesa.nota ?? 'buida'}`}
-                              onBlur={(e) => handleGuardarNota(tramesa.id, e.target.value)}
+                              onBlur={(e) => handleGuardarNota(tramesa, e.target.value)}
                               style={{ width: '60px', padding: '8px', borderRadius: '8px', border: `1px solid ${colors.border}`, textAlign: 'center', fontWeight: '700' }}
                             />
                           </td>
