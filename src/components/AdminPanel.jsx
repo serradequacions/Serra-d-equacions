@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { auth, db } from '../firebase';
 import { signOut } from 'firebase/auth';
 import { 
@@ -13,7 +13,7 @@ import {
   onSnapshot,
   getDocs,
   where,
-  updateDoc //
+  updateDoc
 } from 'firebase/firestore';
 
 export default function AdminPanel({ APP_CONFIG, logoImg }) {
@@ -47,6 +47,7 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
   const [activeTab, setActiveTab] = useState('avisos'); 
   const [expandedCurs, setExpandedCurs] = useState(null); 
   const [isPublishing, setIsPublishing] = useState(false);
+  const [materialRevisio, setMaterialRevisio] = useState(null);
 
   const colors = {
     primary: '#2563eb',
@@ -59,6 +60,57 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
     success: '#10b981',
     accent: '#3b82f6'
   };
+
+  const esTasca = (material) => material?.tipus?.toLowerCase().includes('tasca');
+
+  /** Coincideix amb els camps guardats des de StudentDashboard (materialId + materialTitol). */
+  const entregaPertanyAMaterial = (entrega, material) => {
+    if (!entrega || !material) return false;
+
+    const idMaterial = material.id;
+    const idEntrega = entrega.materialId;
+
+    if (idMaterial && idEntrega && String(idEntrega) === String(idMaterial)) {
+      return true;
+    }
+
+    const titolMaterial = (material.titol || '').trim().toLowerCase();
+    const titolEntrega = (entrega.materialTitol || '').trim().toLowerCase();
+    if (titolMaterial && titolEntrega && titolMaterial === titolEntrega) {
+      return true;
+    }
+
+    return false;
+  };
+
+  const formatFirebaseDate = (data) => {
+    if (!data) return '—';
+    try {
+      if (typeof data.toDate === 'function') {
+        return data.toDate().toLocaleString('ca-ES', {
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+      }
+      if (data instanceof Date) {
+        return data.toLocaleString('ca-ES');
+      }
+      if (typeof data.seconds === 'number') {
+        return new Date(data.seconds * 1000).toLocaleString('ca-ES');
+      }
+    } catch (e) {
+      console.warn('No s\'ha pogut formatar la data de l\'entrega:', e);
+    }
+    return '—';
+  };
+
+  const entreguesPerRevisio = useMemo(() => {
+    if (!materialRevisio) return [];
+    return trameses.filter((t) => entregaPertanyAMaterial(t, materialRevisio));
+  }, [trameses, materialRevisio]);
 
   useEffect(() => {
     const unsubMat = onSnapshot(query(collection(db, "materials"), orderBy("data", "desc")), (snap) => {
@@ -87,14 +139,24 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
     try {
       const notaNum = parseFloat(valor);
       const updateData = (valor === "" || isNaN(notaNum)) ? { nota: null } : { nota: notaNum };
-      await updateDoc(doc(db, "trameses", id), updateData); //
+      await updateDoc(doc(db, "trameses", id), updateData);
     } catch (e) { console.error("Error guardant nota:", e); }
   };
 
   // --- FIX OBERTURA FITXERS ---
   const obrirFitxer = (url) => {
+    if (!url) return;
     const win = window.open(url, '_blank', 'noopener,noreferrer');
     if (win) win.opener = null;
+  };
+
+  const obrirRevisio = (material) => {
+    setMaterialRevisio(material);
+    setActiveTab('materials');
+  };
+
+  const tancarRevisio = () => {
+    setMaterialRevisio(null);
   };
 
   // --- LÒGICA DE NOTIFICACIÓ ---
@@ -210,7 +272,6 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
             <input placeholder="URL" value={recursUrl} onChange={(e) => setRecursUrl(e.target.value)} style={inputStyle(colors)} />
             <textarea placeholder="Descripció..." value={recursDescripcio} onChange={(e) => setRecursDescripcio(e.target.value)} style={{ ...textareaStyle(colors), height: '60px' }} />
 
-            {/* SELECTOR DE TIPUS AMB ICONES */}
             <div style={{ marginBottom: '12px' }}>
               <div style={{ fontSize: '0.75rem', color: colors.textLight, marginBottom: '8px', fontWeight: '600' }}>Tipus</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
@@ -280,29 +341,42 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {trameses.map(t => (
-                    <tr key={t.id} style={{ borderBottom: `1px solid ${colors.border}` }}>
-                      <td style={{ padding: '15px' }}>
-                        <div style={{ fontWeight: '700' }}>{t.alumneNom}</div>
-                        <div style={{ fontSize: '0.75rem', color: colors.primary }}>{t.curs}</div>
-                      </td>
-                      <td style={{ padding: '15px' }}>{t.materialTitol}</td>
-                      <td style={{ padding: '15px' }}>
-                        <button onClick={() => obrirFitxer(t.fileUrl)} style={revisarBtnStyle(colors)}>👁️ Veure</button>
-                      </td>
-                      <td style={{ padding: '15px' }}>
-                        <input 
-                          type="number" step="0.1" min="0" max="10" placeholder="-"
-                          defaultValue={t.nota}
-                          onBlur={(e) => handleGuardarNota(t.id, e.target.value)} //
-                          style={{ width: '60px', padding: '8px', borderRadius: '8px', border: `1px solid ${colors.border}`, textAlign: 'center', fontWeight: '700' }}
-                        />
-                      </td>
-                      <td style={{ padding: '15px' }}>
-                         <button onClick={() => handleEsborrar('trameses', t.id)} style={deleteBtn}>✕</button>
+                  {trameses.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} style={{ padding: '30px', textAlign: 'center', color: colors.textLight, fontStyle: 'italic' }}>
+                        Encara no hi ha cap entrega registrada.
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    trameses.map(t => (
+                      <tr key={t.id} style={{ borderBottom: `1px solid ${colors.border}` }}>
+                        <td style={{ padding: '15px' }}>
+                          <div style={{ fontWeight: '700' }}>{t.alumneNom || 'Alumne sense nom'}</div>
+                          <div style={{ fontSize: '0.75rem', color: colors.primary }}>{t.curs || '—'}</div>
+                        </td>
+                        <td style={{ padding: '15px' }}>{t.materialTitol || '—'}</td>
+                        <td style={{ padding: '15px' }}>
+                          {t.fileUrl ? (
+                            <button onClick={() => obrirFitxer(t.fileUrl)} style={revisarBtnStyle(colors)}>👁️ Veure</button>
+                          ) : (
+                            <span style={{ color: colors.textLight, fontSize: '0.8rem' }}>Sense arxiu</span>
+                          )}
+                        </td>
+                        <td style={{ padding: '15px' }}>
+                          <input 
+                            type="number" step="0.1" min="0" max="10" placeholder="-"
+                            defaultValue={t.nota ?? ''}
+                            key={`nota-global-${t.id}-${t.nota ?? 'buida'}`}
+                            onBlur={(e) => handleGuardarNota(t.id, e.target.value)}
+                            style={{ width: '60px', padding: '8px', borderRadius: '8px', border: `1px solid ${colors.border}`, textAlign: 'center', fontWeight: '700' }}
+                          />
+                        </td>
+                        <td style={{ padding: '15px' }}>
+                          <button onClick={() => handleEsborrar('trameses', t.id)} style={deleteBtn}>✕</button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -336,21 +410,34 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
                     </div>
                     {expandedCurs === curs && (
                       <div style={{ padding: '10px 20px', backgroundColor: 'white' }}>
-                        {materials.filter(m => m.cursos?.includes(curs)).map(m => (
-                          <div key={m.id} style={materialRow(colors)}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                              {/* ICONES DINÀMIQUES RECUPERADES */}
-                              <span style={{ fontSize: '1.2rem' }}>
-                                {APP_CONFIG?.tipusIcons?.[m.tipus] || '📄'}
-                              </span>
-                              <div>
-                                <div style={{ fontWeight: '600', fontSize: '0.9rem' }}>{m.titol}</div>
-                                <div style={{ fontSize: '0.7rem', color: colors.textLight }}>{m.tema}</div>
+                        {materials.filter(m => m.cursos?.includes(curs)).map(m => {
+                          const numEntregues = trameses.filter((t) => entregaPertanyAMaterial(t, m)).length;
+                          return (
+                            <div key={m.id} style={materialRow(colors)}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0 }}>
+                                <span style={{ fontSize: '1.2rem' }}>
+                                  {APP_CONFIG?.tipusIcons?.[m.tipus] || '📄'}
+                                </span>
+                                <div style={{ minWidth: 0 }}>
+                                  <div style={{ fontWeight: '600', fontSize: '0.9rem' }}>{m.titol}</div>
+                                  <div style={{ fontSize: '0.7rem', color: colors.textLight }}>{m.tema} · {m.tipus}</div>
+                                </div>
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
+                                {esTasca(m) && (
+                                  <button
+                                    type="button"
+                                    onClick={() => obrirRevisio(m)}
+                                    style={revisarBtnStyle(colors)}
+                                  >
+                                    Revisar {numEntregues > 0 && `(${numEntregues})`}
+                                  </button>
+                                )}
+                                <button onClick={() => handleEsborrar('materials', m.id)} style={deleteTextBtn}>Eliminar</button>
                               </div>
                             </div>
-                            <button onClick={() => handleEsborrar('materials', m.id)} style={deleteTextBtn}>Eliminar</button>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                  </div>
@@ -359,6 +446,110 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
           )}
         </main>
       </div>
+
+      {materialRevisio && (
+        <div style={modalOverlayStyle} onClick={tancarRevisio}>
+          <div
+            style={modalContentStyle(colors)}
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="revisio-titol"
+          >
+            <div style={modalHeaderStyle}>
+              <div>
+                <h3 id="revisio-titol" style={{ margin: 0, fontSize: '1.25rem', fontWeight: '800', color: colors.textDark }}>
+                  Revisió de la tasca
+                </h3>
+                <p style={{ margin: '8px 0 0 0', color: colors.textLight, fontSize: '0.9rem' }}>
+                  {materialRevisio.titol}
+                </p>
+              </div>
+              <button type="button" onClick={tancarRevisio} style={modalCloseBtnStyle(colors)} aria-label="Tancar">
+                ✕
+              </button>
+            </div>
+
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+                <thead>
+                  <tr style={{ textAlign: 'left', borderBottom: `2px solid ${colors.border}`, color: colors.textLight }}>
+                    <th style={{ padding: '12px 15px' }}>Nom</th>
+                    <th style={{ padding: '12px 15px' }}>Curs</th>
+                    <th style={{ padding: '12px 15px' }}>Data</th>
+                    <th style={{ padding: '12px 15px' }}>Arxiu</th>
+                    <th style={{ padding: '12px 15px' }}>Nota</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {entreguesPerRevisio.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} style={{ padding: '40px 15px', textAlign: 'center', color: colors.textLight, fontStyle: 'italic' }}>
+                        Cap alumne ha lliurat aquesta tasca encara.
+                      </td>
+                    </tr>
+                  ) : (
+                    entreguesPerRevisio.map((t) => (
+                      <tr key={t.id} style={{ borderBottom: `1px solid ${colors.border}` }}>
+                        <td style={{ padding: '14px 15px', fontWeight: '700' }}>
+                          {t.alumneNom || 'Alumne sense nom'}
+                        </td>
+                        <td style={{ padding: '14px 15px', color: colors.primary, fontWeight: '600', fontSize: '0.85rem' }}>
+                          {t.curs || '—'}
+                        </td>
+                        <td style={{ padding: '14px 15px', color: colors.textLight, fontSize: '0.85rem', whiteSpace: 'nowrap' }}>
+                          {formatFirebaseDate(t.data)}
+                        </td>
+                        <td style={{ padding: '14px 15px' }}>
+                          {t.fileUrl ? (
+                            <button
+                              type="button"
+                              onClick={() => obrirFitxer(t.fileUrl)}
+                              style={revisarBtnStyle(colors)}
+                              title={t.fileName || 'Obrir lliurament'}
+                            >
+                              👁️ {t.fileName ? 'Veure' : 'Arxiu'}
+                            </button>
+                          ) : (
+                            <span style={{ color: colors.textLight, fontSize: '0.8rem' }}>Sense arxiu</span>
+                          )}
+                        </td>
+                        <td style={{ padding: '14px 15px' }}>
+                          <input
+                            type="number"
+                            step="0.1"
+                            min="0"
+                            max="10"
+                            placeholder="-"
+                            defaultValue={t.nota ?? ''}
+                            key={`nota-revisio-${t.id}-${t.nota ?? 'buida'}`}
+                            onBlur={(e) => handleGuardarNota(t.id, e.target.value)}
+                            style={{
+                              width: '70px',
+                              padding: '8px',
+                              borderRadius: '8px',
+                              border: `1px solid ${colors.border}`,
+                              textAlign: 'center',
+                              fontWeight: '700'
+                            }}
+                          />
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <div style={{ marginTop: '20px', fontSize: '0.8rem', color: colors.textLight, fontWeight: '600' }}>
+              {entreguesPerRevisio.length} entrega{entreguesPerRevisio.length === 1 ? '' : 'es'} per aquesta tasca
+              {materialRevisio.id && (
+                <span style={{ marginLeft: '8px', opacity: 0.7 }}>· ID material: {materialRevisio.id}</span>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -379,6 +570,50 @@ const deleteTextBtn = { color: '#ef4444', border: 'none', background: 'none', cu
 const logoutBtnStyle = (c) => ({ padding: '10px 20px', border: `1px solid ${c.danger}`, color: c.danger, borderRadius: '10px', background: 'none', fontWeight: '700', cursor: 'pointer' });
 const cursAccordion = (c) => ({ marginBottom: '12px', border: `1px solid ${c.border}`, borderRadius: '12px', overflow: 'hidden' });
 const cursHeader = (c) => ({ padding: '15px 20px', backgroundColor: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' });
-const materialRow = (c) => ({ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: `1px solid ${c.border}` });
+const materialRow = (c) => ({ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: `1px solid ${c.border}`, gap: '15px' });
 const counterBadge = { backgroundColor: '#ef4444', color: 'white', padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', marginLeft: '8px' };
-const revisarBtnStyle = (c) => ({ backgroundColor: '#eff6ff', color: c.primary, padding: '8px 14px', borderRadius: '8px', textDecoration: 'none', fontSize: '0.8rem', fontWeight: '700', border: `1px solid ${c.accent}`, cursor: 'pointer' });
+const revisarBtnStyle = (c) => ({ backgroundColor: '#eff6ff', color: c.primary, padding: '8px 14px', borderRadius: '8px', textDecoration: 'none', fontSize: '0.8rem', fontWeight: '700', border: `1px solid ${c.accent}`, cursor: 'pointer', whiteSpace: 'nowrap' });
+
+const modalOverlayStyle = {
+  position: 'fixed',
+  inset: 0,
+  backgroundColor: 'rgba(15, 23, 42, 0.55)',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: '24px',
+  zIndex: 2000
+};
+
+const modalContentStyle = (c) => ({
+  backgroundColor: c.card,
+  borderRadius: '20px',
+  padding: '28px 32px',
+  width: '100%',
+  maxWidth: '960px',
+  maxHeight: '85vh',
+  overflowY: 'auto',
+  boxShadow: '0 25px 60px rgba(0, 0, 0, 0.2)',
+  border: `1px solid ${c.border}`
+});
+
+const modalHeaderStyle = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'flex-start',
+  marginBottom: '24px',
+  gap: '20px'
+};
+
+const modalCloseBtnStyle = (c) => ({
+  border: `1px solid ${c.border}`,
+  background: '#f8fafc',
+  color: c.textLight,
+  width: '40px',
+  height: '40px',
+  borderRadius: '10px',
+  cursor: 'pointer',
+  fontSize: '1.1rem',
+  fontWeight: '700',
+  flexShrink: 0
+});
