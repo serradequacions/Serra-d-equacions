@@ -143,6 +143,9 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
   const [expandedCurs, setExpandedCurs] = useState(null);
   const [isPublishing, setIsPublishing] = useState(false);
   const [materialRevisio, setMaterialRevisio] = useState(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [contactForm, setContactForm] = useState({ nom: '', correu: '', missatge: '' });
 
   const colors = {
     primary: '#2563eb',
@@ -203,11 +206,19 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
       setTrameses(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     });
 
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+
+    handleResize();
+    window.addEventListener('resize', handleResize);
+
     return () => {
       unsubMat();
       unsubAv();
       unsubTemes();
       unsubTram();
+      window.removeEventListener('resize', handleResize);
     };
   }, []);
 
@@ -440,21 +451,27 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
   };
 
   return (
-    <div style={{ backgroundColor: colors.bg, minHeight: '100vh', padding: '40px 20px', fontFamily: '"Inter", sans-serif' }}>
-      <header style={{ maxWidth: '1250px', margin: '0 auto 40px auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-          {logoImg && <img src={logoImg} alt="Logo" style={{ height: '60px', borderRadius: '12px' }} />}
-          <h1 style={{ margin: 0, fontSize: '1.6rem', color: colors.textDark, fontWeight: '800' }}>Gestió del Campus (Admin)</h1>
+    <div style={{ backgroundColor: colors.bg, minHeight: '100vh', padding: isMobile ? '15px' : '40px 20px', fontFamily: '"Inter", sans-serif' }}>
+      <header style={{ maxWidth: '1250px', margin: '0 auto 20px auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '15px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+          {logoImg && <img src={logoImg} alt="Logo" style={{ height: isMobile ? '40px' : '60px', borderRadius: '12px' }} />}
+          <h1 style={{ margin: 0, fontSize: isMobile ? '1.1rem' : '1.6rem', color: colors.textDark, fontWeight: '800' }}>Gestió del Campus (Admin)</h1>
         </div>
-        <button onClick={() => signOut(auth)} style={logoutBtnStyle(colors)}>Tancar sessió</button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {isMobile && (
+            <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} style={{ padding: '10px 15px', backgroundColor: colors.primary, color: 'white', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', fontSize: '1.2rem' }}>☰</button>
+          )}
+          <button onClick={() => signOut(auth)} style={logoutBtnStyle(colors)}>Tancar sessió</button>
+        </div>
       </header>
 
-      <div style={{ maxWidth: '1250px', margin: '0 auto', display: 'grid', gridTemplateColumns: '400px 1fr', gap: '30px' }}>
-        <aside>
-          <div style={cardStyle(colors)}>
+      <div style={{ maxWidth: '1250px', margin: '0 auto', display: isMobile ? 'block' : 'grid', gridTemplateColumns: isMobile ? '1fr' : '400px 1fr', gap: '30px' }}>
+        {(!isMobile || mobileMenuOpen) && (
+          <aside style={{ marginBottom: isMobile ? '20px' : '0' }}>
+            <div style={cardStyle(colors)}>
             <h3 style={cardTitleStyle(colors)}>📢 Crear Nou Avís</h3>
             <textarea placeholder="Missatge..." value={avisContingut} onChange={(e) => setAvisContingut(e.target.value)} style={textareaStyle(colors)} />
-            <div style={checkboxGrid}>
+            <div style={checkboxGrid(isMobile)}>
               {LLISTA_CURSOS.map((curs) => (
                 <label key={curs} style={checkLabel}>
                   <input type="checkbox" checked={avisCursos.includes(curs)} onChange={() => toggleCheckbox(curs, avisCursos, setAvisCursos)} /> {curs}
@@ -508,7 +525,7 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
             </select>
 
             <input placeholder="Nou tema..." value={temaLliure} onChange={(e) => setTemaLliure(e.target.value)} style={inputStyle(colors)} />
-            <div style={checkboxGrid}>
+            <div style={checkboxGrid(isMobile)}>
               {LLISTA_CURSOS.map((curs) => (
                 <label key={curs} style={checkLabel}>
                   <input type="checkbox" checked={recursCursos.includes(curs)} onChange={() => toggleCheckbox(curs, recursCursos, setRecursCursos)} /> {curs}
@@ -517,10 +534,11 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
             </div>
             <button onClick={handlePublicarMaterial} disabled={isPublishing} style={{ ...primaryButtonStyle(colors), backgroundColor: colors.success }}>Publicar</button>
           </div>
-        </aside>
+          </aside>
+        )}
 
         <main style={cardStyle(colors)}>
-          <div style={tabsHeader(colors)}>
+          <div style={tabsHeader(colors, isMobile)}>
             <button onClick={() => setActiveTab('avisos')} style={tabButtonStyle(activeTab === 'avisos', colors)}>Avisos</button>
             <button onClick={() => setActiveTab('materials')} style={tabButtonStyle(activeTab === 'materials', colors)}>Continguts</button>
             <button onClick={() => setActiveTab('trameses')} style={tabButtonStyle(activeTab === 'trameses', colors)}>
@@ -600,7 +618,7 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
           {activeTab === 'avisos' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {avisosLlista.map((a) => (
-                <div key={a.id} style={listItemStyle(colors)}>
+                <div key={a.id} style={listItemStyle(colors, isMobile)}>
                   <div style={{ flex: 1 }}>
                     <p style={{ margin: '0 0 8px 0', fontSize: '0.95rem' }}>{a.contingut}</p>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
@@ -630,7 +648,7 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
                       {materials.filter((m) => m.cursos?.includes(curs)).map((m) => {
                         const numEntregues = trameses.filter((tramesa) => entregaPertanyAMaterial(tramesa, m)).length;
                         return (
-                          <div key={m.id} style={materialRow(colors)}>
+                          <div key={m.id} style={materialRow(colors, isMobile)}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0 }}>
                               <span style={{ fontSize: '1.2rem' }}>{APP_CONFIG?.tipusIcons?.[m.tipus] || '📄'}</span>
                               <div style={{ minWidth: 0 }}>
@@ -712,6 +730,72 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
           </div>
         </div>
       )}
+
+      <footer style={footerStyle(colors, isMobile)}>
+        <div style={footerContentStyle(isMobile)}>
+          <div style={footerSectionStyle(isMobile)}>
+            <h4 style={footerTitleStyle(colors)}>💡 Inspiració Matemàtica</h4>
+            <p style={footerQuoteStyle(colors)}>
+              "La matemàtica és l'alfabet amb el qual Déu ha escrit l'univers."
+            </p>
+            <p style={footerAuthorStyle(colors)}>— Galileo Galilei</p>
+          </div>
+
+          <div style={footerSectionStyle(isMobile)}>
+            <h4 style={footerTitleStyle(colors)}>📬 Contacte</h4>
+            <div style={footerFormStyle}>
+              <input
+                type="text"
+                placeholder="Nom"
+                value={contactForm.nom}
+                onChange={(e) => setContactForm({ ...contactForm, nom: e.target.value })}
+                style={footerInputStyle(colors)}
+              />
+              <input
+                type="email"
+                placeholder="Correu"
+                value={contactForm.correu}
+                onChange={(e) => setContactForm({ ...contactForm, correu: e.target.value })}
+                style={footerInputStyle(colors)}
+              />
+              <textarea
+                placeholder="Missatge"
+                value={contactForm.missatge}
+                onChange={(e) => setContactForm({ ...contactForm, missatge: e.target.value })}
+                style={footerTextareaStyle(colors)}
+                rows={3}
+              />
+              <button
+                onClick={() => {
+                  const mailtoLink = `mailto:serradequacions@gmail.com?subject=Consulta des de la web&body=Nom: ${contactForm.nom}%0ACorreu: ${contactForm.correu}%0AMissatge: ${contactForm.missatge}`;
+                  window.open(mailtoLink, '_blank');
+                }}
+                style={footerButtonStyle(colors)}
+              >
+                Enviar Missatge
+              </button>
+            </div>
+          </div>
+
+          <div style={footerSectionStyle(isMobile)}>
+            <h4 style={footerTitleStyle(colors)}>📸 Segueix-nos</h4>
+            <a
+              href="https://www.instagram.com/serradequacions"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={instagramButtonStyle(colors, isMobile)}
+            >
+              <span style={{ fontSize: isMobile ? '1.5rem' : '1.8rem' }}>📷</span>
+              <span style={{ marginLeft: '8px', fontWeight: '700' }}>@serradequacions</span>
+            </a>
+          </div>
+        </div>
+        <div style={footerBottomStyle(colors)}>
+          <p style={{ margin: 0, fontSize: '0.8rem', color: colors.textLight }}>
+            © {new Date().getFullYear()} Serra d'Equacions. Tots els drets reservats.
+          </p>
+        </div>
+      </footer>
     </div>
   );
 }
@@ -721,18 +805,18 @@ const cardTitleStyle = (c) => ({ margin: '0 0 20px 0', fontSize: '1.1rem', color
 const inputStyle = (c) => ({ width: '100%', padding: '12px', marginBottom: '12px', borderRadius: '10px', border: `1px solid ${c.border}`, fontSize: '0.9rem', boxSizing: 'border-box' });
 const textareaStyle = (c) => ({ ...inputStyle(c), height: '80px', resize: 'none', fontFamily: 'inherit' });
 const primaryButtonStyle = (c) => ({ width: '100%', padding: '14px', backgroundColor: c.primary, color: 'white', border: 'none', borderRadius: '10px', fontWeight: '700', cursor: 'pointer' });
-const checkboxGrid = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', padding: '12px', backgroundColor: '#f1f5f9', borderRadius: '10px', marginBottom: '20px', maxHeight: '150px', overflowY: 'auto' };
+const checkboxGrid = (isMobile) => ({ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '8px', padding: '12px', backgroundColor: '#f1f5f9', borderRadius: '10px', marginBottom: '20px', maxHeight: '150px', overflowY: 'auto' });
 const checkLabel = { fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '8px' };
-const tabsHeader = (c) => ({ display: 'flex', gap: '30px', borderBottom: `2px solid ${c.border}`, marginBottom: '25px' });
+const tabsHeader = (c, isMobile) => ({ display: 'flex', gap: isMobile ? '15px' : '30px', borderBottom: `2px solid ${c.border}`, marginBottom: '25px', overflowX: 'auto', flexWrap: 'wrap' });
 const tabButtonStyle = (active, c) => ({ padding: '12px 5px', border: 'none', background: 'none', borderBottom: active ? `3px solid ${c.primary}` : '3px solid transparent', color: active ? c.primary : c.textLight, fontWeight: '700', cursor: 'pointer' });
-const listItemStyle = (c) => ({ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px', border: `1px solid ${c.border}`, borderRadius: '12px', backgroundColor: '#fff' });
+const listItemStyle = (c, isMobile) => ({ display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', padding: '15px', border: `1px solid ${c.border}`, borderRadius: '12px', backgroundColor: '#fff', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? '10px' : '0' });
 const badgeStyle = (c) => ({ fontSize: '0.65rem', backgroundColor: '#dbeafe', color: c.primary, padding: '3px 8px', borderRadius: '5px', fontWeight: '800' });
 const deleteBtn = { color: '#cbd5e1', border: 'none', background: 'none', cursor: 'pointer', fontSize: '1.2rem' };
 const deleteTextBtn = { color: '#ef4444', border: 'none', background: 'none', cursor: 'pointer', fontSize: '0.75rem', fontWeight: '600' };
 const logoutBtnStyle = (c) => ({ padding: '10px 20px', border: `1px solid ${c.danger}`, color: c.danger, borderRadius: '10px', background: 'none', fontWeight: '700', cursor: 'pointer' });
 const cursAccordion = (c) => ({ marginBottom: '12px', border: `1px solid ${c.border}`, borderRadius: '12px', overflow: 'hidden' });
 const cursHeader = (c) => ({ padding: '15px 20px', backgroundColor: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' });
-const materialRow = (c) => ({ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: `1px solid ${c.border}`, gap: '15px' });
+const materialRow = (c, isMobile) => ({ display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', padding: '12px 0', borderBottom: `1px solid ${c.border}`, gap: '15px', flexDirection: isMobile ? 'column' : 'row' });
 const counterBadge = { backgroundColor: '#ef4444', color: 'white', padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', marginLeft: '8px' };
 const revisarBtnStyle = (c) => ({ backgroundColor: '#eff6ff', color: c.primary, padding: '8px 14px', borderRadius: '8px', textDecoration: 'none', fontSize: '0.8rem', fontWeight: '700', border: `1px solid ${c.accent}`, cursor: 'pointer', whiteSpace: 'nowrap' });
 
@@ -778,4 +862,104 @@ const modalCloseBtnStyle = (c) => ({
   fontSize: '1.1rem',
   fontWeight: '700',
   flexShrink: 0
+});
+
+const footerStyle = (c, isMobile) => ({
+  backgroundColor: c.card,
+  borderTop: `2px solid ${c.border}`,
+  padding: isMobile ? '30px 20px' : '50px 40px',
+  marginTop: '60px',
+  boxShadow: '0 -4px 20px rgba(0,0,0,0.03)'
+});
+
+const footerContentStyle = (isMobile) => ({
+  maxWidth: '1250px',
+  margin: '0 auto',
+  display: 'grid',
+  gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
+  gap: isMobile ? '30px' : '40px'
+});
+
+const footerSectionStyle = (isMobile) => ({
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '15px'
+});
+
+const footerTitleStyle = (c) => ({
+  margin: '0 0 10px 0',
+  fontSize: '1.1rem',
+  color: c.textDark,
+  fontWeight: '800',
+  letterSpacing: '-0.5px'
+});
+
+const footerQuoteStyle = (c) => ({
+  margin: '0 0 8px 0',
+  fontSize: '0.95rem',
+  color: c.textDark,
+  fontStyle: 'italic',
+  lineHeight: '1.6'
+});
+
+const footerAuthorStyle = (c) => ({
+  margin: '0',
+  fontSize: '0.85rem',
+  color: c.primary,
+  fontWeight: '700'
+});
+
+const footerFormStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '12px'
+};
+
+const footerInputStyle = (c) => ({
+  padding: '12px',
+  borderRadius: '8px',
+  border: `1px solid ${c.border}`,
+  fontSize: '0.9rem',
+  boxSizing: 'border-box',
+  fontFamily: 'inherit'
+});
+
+const footerTextareaStyle = (c) => ({
+  ...footerInputStyle(c),
+  resize: 'none',
+  minHeight: '80px'
+});
+
+const footerButtonStyle = (c) => ({
+  padding: '12px 20px',
+  backgroundColor: c.primary,
+  color: 'white',
+  border: 'none',
+  borderRadius: '8px',
+  fontWeight: '700',
+  cursor: 'pointer',
+  fontSize: '0.9rem',
+  transition: 'all 0.2s ease'
+});
+
+const instagramButtonStyle = (c, isMobile) => ({
+  display: 'inline-flex',
+  alignItems: 'center',
+  padding: isMobile ? '12px 20px' : '14px 24px',
+  borderRadius: '12px',
+  textDecoration: 'none',
+  fontSize: isMobile ? '0.9rem' : '1rem',
+  fontWeight: '700',
+  background: 'linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)',
+  color: 'white',
+  transition: 'all 0.3s ease',
+  boxShadow: '0 4px 15px rgba(220, 39, 67, 0.3)'
+});
+
+const footerBottomStyle = (c) => ({
+  maxWidth: '1250px',
+  margin: '40px auto 0 auto',
+  paddingTop: '20px',
+  borderTop: `1px solid ${c.border}`,
+  textAlign: 'center'
 });

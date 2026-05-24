@@ -57,6 +57,9 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
   const [view, setView] = useState('inici'); 
   const [selectedMaterial, setSelectedMaterial] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [contactForm, setContactForm] = useState({ nom: '', correu: '', missatge: '' });
   
   // --- ESTATS DE TRAMESA I CLOUDINARY ---
   const [isUploading, setIsUploading] = useState(false);
@@ -107,6 +110,21 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
   }, [materials, entregasAlumne]);
 
   // --- EFECTE: CÀRREGA DE DADES DE L'ALUMNE ---
+  useEffect(() => {
+    if (!user) return;
+
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+
+    handleResize();
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
+
   useEffect(() => {
     if (!user) return;
 
@@ -336,7 +354,7 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
       <div
         key={m.id}
         onClick={() => { setSelectedMaterial(m); setView('detall'); }}
-        style={completada ? materialRowCompletadaStyle(colors) : materialRowStyle(colors)}
+        style={completada ? materialRowCompletadaStyle(colors, isMobile) : materialRowStyle(colors, isMobile)}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '22px' }}>
           <span style={{ fontSize: '2rem' }}>{APP_CONFIG.tipusIcons[m.tipus] || '📄'}</span>
@@ -386,23 +404,28 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
       <nav style={navStyle(colors)}>
         <div style={navContentStyle}>
           <div style={logoAreaStyle} onClick={() => setView('inici')}>
-            {logoImg && <img src={logoImg} alt="Logo" style={{ height: '42px', borderRadius: '10px' }} />}
+            {logoImg && <img src={logoImg} alt="Logo" style={{ height: isMobile ? '35px' : '42px', borderRadius: '10px' }} />}
             <span style={brandTextStyle(colors)}>Campus Serra</span>
           </div>
           <div style={navLinksArea}>
-            <button onClick={() => setView('inici')} style={navLink(view === 'inici', colors)}>Inici</button>
-            <button onClick={() => setView('materials')} style={navLink(view === 'materials', colors)}>Aula Virtual</button>
-            <button onClick={() => setView('consultes')} style={navLink(view === 'consultes', colors)}>💬 Consultes Privades</button>
-            <button onClick={() => signOut(auth)} style={logoutBtn(colors)}>Tancar sessió</button>
+            {isMobile && (
+              <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} style={{ padding: '10px 15px', backgroundColor: colors.primary, color: 'white', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', fontSize: '1.2rem' }}>☰</button>
+            )}
+            <div style={{ display: isMobile ? (mobileMenuOpen ? 'flex' : 'none') : 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? '10px' : '40px', alignItems: isMobile ? 'flex-start' : 'center', position: isMobile ? 'absolute' : 'static', top: isMobile ? '100%' : 'auto', left: isMobile ? '0' : 'auto', right: isMobile ? '0' : 'auto', backgroundColor: isMobile ? 'white' : 'transparent', padding: isMobile ? '20px' : '0', borderBottom: isMobile ? `1px solid ${colors.border}` : 'none', boxShadow: isMobile ? '0 4px 20px rgba(0,0,0,0.1)' : 'none', zIndex: isMobile ? '1000' : 'auto' }}>
+              <button onClick={() => { setView('inici'); setMobileMenuOpen(false); }} style={navLink(view === 'inici', colors)}>Inici</button>
+              <button onClick={() => { setView('materials'); setMobileMenuOpen(false); }} style={navLink(view === 'materials', colors)}>Aula Virtual</button>
+              <button onClick={() => { setView('consultes'); setMobileMenuOpen(false); }} style={navLink(view === 'consultes', colors)}>💬 Consultes Privades</button>
+              <button onClick={() => signOut(auth)} style={logoutBtn(colors)}>Tancar sessió</button>
+            </div>
           </div>
         </div>
       </nav>
 
-      <main style={mainLayout}>
+      <main style={mainLayout(isMobile)}>
         
         {view === 'inici' && (
           <div className="fade-in">
-            <div style={welcomeBanner(colors)}>
+            <div style={welcomeBanner(colors, isMobile)}>
               <div style={{ flex: 1 }}>
                 <h1 style={{ margin: 0, fontSize: '2.5rem', fontWeight: '900', letterSpacing: '-1.5px' }}>Benvingut, {studentData?.nom}!</h1>
                 <p style={{ margin: '15px 0 0 0', opacity: 0.9, fontSize: '1.2rem', fontWeight: '500' }}>
@@ -413,13 +436,13 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
             </div>
 
             <h3 style={sectionLabel}>El teu progrés</h3>
-            <div style={progressCardStyle(colors)}>
+            <div style={progressCardStyle(colors, isMobile)}>
               {progrés.total === 0 ? (
                 <div style={{ textAlign: 'center', padding: '30px 20px', color: colors.textLight, fontWeight: '600', fontSize: '1.05rem' }}>
                   Encara no hi ha tasques assignades al teu curs.
                 </div>
               ) : (
-                <div style={progressLayoutStyle}>
+                <div style={progressLayoutStyle(isMobile)}>
                   <div style={progressDonutWrapStyle}>
                     <ProgressDonut percent={progrés.percent} colors={colors} />
                     <div style={progressDonutLabelStyle}>
@@ -431,7 +454,7 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
                   </div>
 
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={progressStatsRowStyle}>
+                    <div style={progressStatsRowStyle(isMobile)}>
                       <div style={progressStatBoxStyle(colors, colors.primary)}>
                         <div style={progressStatValueStyle}>{progrés.completades}</div>
                         <div style={progressStatLabelStyle(colors)}>Tasques completades</div>
@@ -474,10 +497,10 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
             
             <h3 style={sectionLabel}>Últimes Notícies</h3>
             {avisos.length === 0 ? (
-              <div style={emptyState(colors)}>No hi ha avisos pendents.</div>
+              <div style={emptyState(colors, isMobile)}>No hi ha avisos pendents.</div>
             ) : (
               avisos.map(a => (
-                <div key={a.id} style={cardStyle(colors)}>
+                <div key={a.id} style={cardStyle(colors, isMobile)}>
                   <div style={{ display: 'flex', gap: '25px' }}>
                     <div style={iconCircle(colors, '#eff6ff', colors.primary)}>📢</div>
                     <div style={{ flex: 1 }}>
@@ -499,7 +522,7 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
             </div>
 
             {materials.length === 0 ? (
-              <div style={emptyState(colors)}>Encara no s'ha publicat contingut.</div>
+              <div style={emptyState(colors, isMobile)}>Encara no s'ha publicat contingut.</div>
             ) : (
               Object.entries(
                 materials.reduce((acc, m) => {
@@ -564,7 +587,7 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
             {selectedMaterial.url && (
               <button 
                 onClick={() => handleOpenFile(selectedMaterial.url)} 
-                style={{...attachmentCardStyle(colors), width: '100%', border: 'none', cursor: 'pointer', textAlign: 'left'}}
+                style={{...attachmentCardStyle(colors, isMobile), width: '100%', border: 'none', cursor: 'pointer', textAlign: isMobile ? 'center' : 'left'}}
               >
                 <div style={{ fontSize: '2rem' }}>📂</div>
                 <div style={{ flex: 1 }}>
@@ -578,7 +601,7 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
             {selectedMaterial.tipus?.toLowerCase().includes('tasca') && (
               <div style={submissionSectionStyle(colors)}>
                 {tascaCompletada && (
-                  <div style={tascaCompletadaBannerStyle(colors)}>
+                  <div style={tascaCompletadaBannerStyle(colors, isMobile)}>
                     <span style={{ fontSize: '1.5rem' }}>✅</span>
                     <div>
                       <div style={{ fontWeight: '900', fontSize: '1.1rem', color: colors.success }}>Tasca Completada</div>
@@ -598,7 +621,7 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
                 </div>
                 
                 <div style={{ marginBottom: '35px' }}>
-                  <label style={uploadDropzoneStyle(isUploading, colors, tascaCompletada)}>
+                  <label style={uploadDropzoneStyle(isUploading, colors, tascaCompletada, isMobile)}>
                     {isUploading ? (
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>
                         <div className="spinner-white"></div>
@@ -639,7 +662,7 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
                 </div>
 
                 {entregaActual && (
-                  <div style={tascaCompletada ? confirmedSubmissionCompletadaStyle(colors) : confirmedSubmissionStyle(colors)}>
+                  <div style={tascaCompletada ? confirmedSubmissionCompletadaStyle(colors, isMobile) : confirmedSubmissionStyle(colors, isMobile)}>
                     <div style={{ flex: 1 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -673,6 +696,72 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
           </div>
         )}
       </main>
+
+      <footer style={footerStyle(colors, isMobile)}>
+        <div style={footerContentStyle(isMobile)}>
+          <div style={footerSectionStyle(isMobile)}>
+            <h4 style={footerTitleStyle(colors)}>💡 Inspiració Matemàtica</h4>
+            <p style={footerQuoteStyle(colors)}>
+              "La matemàtica és l'alfabet amb el qual Déu ha escrit l'univers."
+            </p>
+            <p style={footerAuthorStyle(colors)}>— Galileo Galilei</p>
+          </div>
+
+          <div style={footerSectionStyle(isMobile)}>
+            <h4 style={footerTitleStyle(colors)}>📬 Contacte</h4>
+            <div style={footerFormStyle}>
+              <input
+                type="text"
+                placeholder="Nom"
+                value={contactForm.nom}
+                onChange={(e) => setContactForm({ ...contactForm, nom: e.target.value })}
+                style={footerInputStyle(colors)}
+              />
+              <input
+                type="email"
+                placeholder="Correu"
+                value={contactForm.correu}
+                onChange={(e) => setContactForm({ ...contactForm, correu: e.target.value })}
+                style={footerInputStyle(colors)}
+              />
+              <textarea
+                placeholder="Missatge"
+                value={contactForm.missatge}
+                onChange={(e) => setContactForm({ ...contactForm, missatge: e.target.value })}
+                style={footerTextareaStyle(colors)}
+                rows={3}
+              />
+              <button
+                onClick={() => {
+                  const mailtoLink = `mailto:serradequacions@gmail.com?subject=Consulta des de la web&body=Nom: ${contactForm.nom}%0ACorreu: ${contactForm.correu}%0AMissatge: ${contactForm.missatge}`;
+                  window.open(mailtoLink, '_blank');
+                }}
+                style={footerButtonStyle(colors)}
+              >
+                Enviar Missatge
+              </button>
+            </div>
+          </div>
+
+          <div style={footerSectionStyle(isMobile)}>
+            <h4 style={footerTitleStyle(colors)}>📸 Segueix-nos</h4>
+            <a
+              href="https://www.instagram.com/serradequacions"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={instagramButtonStyle(colors, isMobile)}
+            >
+              <span style={{ fontSize: isMobile ? '1.5rem' : '1.8rem' }}>📷</span>
+              <span style={{ marginLeft: '8px', fontWeight: '700' }}>@serradequacions</span>
+            </a>
+          </div>
+        </div>
+        <div style={footerBottomStyle(colors)}>
+          <p style={{ margin: 0, fontSize: '0.8rem', color: colors.textLight }}>
+            © {new Date().getFullYear()} Serra d'Equacions. Tots els drets reservats.
+          </p>
+        </div>
+      </footer>
 
       <style>{`
         .fade-in { animation: fadeIn 0.6s cubic-bezier(0.23, 1, 0.32, 1); }
@@ -755,12 +844,12 @@ const logoutBtn = (c) => ({
   background: 'white', color: c.danger, fontWeight: '800', cursor: 'pointer', fontSize: '0.95rem'
 });
 
-const mainLayout = { maxWidth: '1000px', margin: '60px auto', padding: '0 40px', boxSizing: 'border-box' };
+const mainLayout = (isMobile) => ({ maxWidth: '1000px', margin: isMobile ? '30px auto' : '60px auto', padding: isMobile ? '0 20px' : '0 40px', boxSizing: 'border-box' });
 
-const welcomeBanner = (c) => ({
+const welcomeBanner = (c, isMobile) => ({
   background: `linear-gradient(135deg, ${c.primary}, ${c.accent})`,
-  color: 'white', padding: '60px', borderRadius: '40px', marginBottom: '60px',
-  boxShadow: '0 25px 50px rgba(37, 99, 235, 0.2)', display: 'flex', alignItems: 'center'
+  color: 'white', padding: isMobile ? '30px' : '60px', borderRadius: isMobile ? '20px' : '40px', marginBottom: isMobile ? '30px' : '60px',
+  boxShadow: '0 25px 50px rgba(37, 99, 235, 0.2)', display: 'flex', alignItems: 'center', flexDirection: isMobile ? 'column' : 'row', textAlign: isMobile ? 'center' : 'left'
 });
 
 const sectionLabel = { 
@@ -768,21 +857,22 @@ const sectionLabel = {
   marginBottom: '30px', fontWeight: '900', letterSpacing: '2px', paddingLeft: '5px' 
 };
 
-const progressCardStyle = (c) => ({
+const progressCardStyle = (c, isMobile) => ({
   background: c.card,
-  borderRadius: '30px',
-  padding: '45px',
+  borderRadius: isMobile ? '20px' : '30px',
+  padding: isMobile ? '25px' : '45px',
   border: `1px solid ${c.border}`,
-  marginBottom: '60px',
+  marginBottom: isMobile ? '30px' : '60px',
   boxShadow: '0 15px 35px rgba(0,0,0,0.02)'
 });
 
-const progressLayoutStyle = {
+const progressLayoutStyle = (isMobile) => ({
   display: 'flex',
-  gap: '50px',
-  alignItems: 'center',
-  flexWrap: 'wrap'
-};
+  gap: isMobile ? '30px' : '50px',
+  alignItems: isMobile ? 'flex-start' : 'center',
+  flexWrap: 'wrap',
+  flexDirection: isMobile ? 'column' : 'row'
+});
 
 const progressDonutWrapStyle = {
   position: 'relative',
@@ -799,11 +889,12 @@ const progressDonutLabelStyle = {
   pointerEvents: 'none'
 };
 
-const progressStatsRowStyle = {
+const progressStatsRowStyle = (isMobile) => ({
   display: 'flex',
-  gap: '18px',
-  flexWrap: 'wrap'
-};
+  gap: isMobile ? '12px' : '18px',
+  flexWrap: 'wrap',
+  flexDirection: isMobile ? 'column' : 'row'
+});
 
 const progressStatBoxStyle = (c, accent) => ({
   flex: '1 1 120px',
@@ -853,9 +944,9 @@ const progressBarFillStyle = (c, percent) => ({
   transition: 'width 0.6s ease'
 });
 
-const cardStyle = (c) => ({
-  background: c.card, borderRadius: '30px', padding: '45px', border: `1px solid ${c.border}`,
-  marginBottom: '35px', boxShadow: '0 15px 35px rgba(0,0,0,0.02)'
+const cardStyle = (c, isMobile) => ({
+  background: c.card, borderRadius: isMobile ? '20px' : '30px', padding: isMobile ? '25px' : '45px', border: `1px solid ${c.border}`,
+  marginBottom: isMobile ? '20px' : '35px', boxShadow: '0 15px 35px rgba(0,0,0,0.02)'
 });
 
 const iconCircle = (c, bg, color) => ({
@@ -873,15 +964,15 @@ const temaHeader = (c) => ({
   display: 'inline-block', letterSpacing: '-0.5px'
 });
 
-const materialRowStyle = (c) => ({
-  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-  padding: '28px 35px', backgroundColor: '#fff', border: `1px solid ${c.border}`,
-  borderRadius: '25px', marginBottom: '20px', cursor: 'pointer',
-  boxShadow: '0 6px 15px rgba(0,0,0,0.01)'
+const materialRowStyle = (c, isMobile) => ({
+  display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center',
+  padding: isMobile ? '20px 25px' : '28px 35px', backgroundColor: '#fff', border: `1px solid ${c.border}`,
+  borderRadius: isMobile ? '15px' : '25px', marginBottom: '20px', cursor: 'pointer',
+  boxShadow: '0 6px 15px rgba(0,0,0,0.01)', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? '15px' : '0'
 });
 
-const materialRowCompletadaStyle = (c) => ({
-  ...materialRowStyle(c),
+const materialRowCompletadaStyle = (c, isMobile) => ({
+  ...materialRowStyle(c, isMobile),
   backgroundColor: '#f0fdf4',
   border: `2px solid ${c.success}`,
   boxShadow: '0 8px 20px rgba(16, 185, 129, 0.1)'
@@ -897,16 +988,17 @@ const subSectionLabelStyle = (c, accent = c.primary) => ({
   paddingLeft: '5px'
 });
 
-const tascaCompletadaBannerStyle = (c) => ({
+const tascaCompletadaBannerStyle = (c, isMobile) => ({
   display: 'flex',
-  alignItems: 'center',
+  alignItems: isMobile ? 'flex-start' : 'center',
   gap: '18px',
-  padding: '22px 28px',
-  borderRadius: '20px',
+  padding: isMobile ? '18px 20px' : '22px 28px',
+  borderRadius: isMobile ? '15px' : '20px',
   backgroundColor: '#f0fdf4',
   border: `2px solid ${c.success}`,
-  marginBottom: '35px',
-  boxShadow: '0 8px 20px rgba(16, 185, 129, 0.08)'
+  marginBottom: isMobile ? '20px' : '35px',
+  boxShadow: '0 8px 20px rgba(16, 185, 129, 0.08)',
+  flexDirection: isMobile ? 'column' : 'row'
 });
 
 const backBtnStyle = (c) => ({
@@ -920,21 +1012,21 @@ const instruccionsBoxStyle = {
   border: '1px solid #e2e8f0', marginBottom: '40px'
 };
 
-const attachmentCardStyle = (c) => ({
-  display: 'flex', alignItems: 'center', gap: '25px', padding: '30px',
-  borderRadius: '25px', border: `1px solid ${c.border}`, textDecoration: 'none',
+const attachmentCardStyle = (c, isMobile) => ({
+  display: 'flex', alignItems: 'center', gap: isMobile ? '15px' : '25px', padding: isMobile ? '20px' : '30px',
+  borderRadius: isMobile ? '15px' : '25px', border: `1px solid ${c.border}`, textDecoration: 'none',
   color: c.textDark, marginTop: '25px', backgroundColor: '#fff', 
-  boxShadow: '0 5px 15px rgba(0,0,0,0.02)'
+  boxShadow: '0 5px 15px rgba(0,0,0,0.02)', flexDirection: isMobile ? 'column' : 'row', textAlign: isMobile ? 'center' : 'left'
 });
 
 const submissionSectionStyle = (c) => ({
   marginTop: '70px', borderTop: `2px solid ${c.border}`, paddingTop: '60px'
 });
 
-const uploadDropzoneStyle = (loading, c, desactivat = false) => ({
+const uploadDropzoneStyle = (loading, c, desactivat = false, isMobile = false) => ({
   display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', 
-  padding: '70px 50px', textAlign: 'center', border: `4px dashed ${desactivat ? c.border : c.primary}`, 
-  borderRadius: '35px', cursor: loading || desactivat ? 'not-allowed' : 'pointer', 
+  padding: isMobile ? '40px 30px' : '70px 50px', textAlign: 'center', border: `4px dashed ${desactivat ? c.border : c.primary}`, 
+  borderRadius: isMobile ? '20px' : '35px', cursor: loading || desactivat ? 'not-allowed' : 'pointer', 
   color: loading ? '#fff' : desactivat ? c.textLight : c.primary, fontWeight: '900', 
   backgroundColor: loading ? c.primary : desactivat ? '#f1f5f9' : '#eff6ff',
   opacity: desactivat && !loading ? 0.75 : 1
@@ -944,14 +1036,14 @@ const statusText = (color) => ({
   fontSize: '1.1rem', color: color, fontWeight: '800', marginTop: '30px', textAlign: 'center' 
 });
 
-const confirmedSubmissionStyle = (c) => ({
-  display: 'flex', alignItems: 'center', gap: '35px', padding: '30px 40px',
-  borderRadius: '28px', border: `2px solid ${c.success}`, backgroundColor: '#f0fdf4', 
-  marginTop: '35px', boxShadow: '0 8px 20px rgba(16, 185, 129, 0.08)'
+const confirmedSubmissionStyle = (c, isMobile) => ({
+  display: 'flex', alignItems: isMobile ? 'flex-start' : 'center', gap: isMobile ? '20px' : '35px', padding: isMobile ? '20px 25px' : '30px 40px',
+  borderRadius: isMobile ? '20px' : '28px', border: `2px solid ${c.success}`, backgroundColor: '#f0fdf4', 
+  marginTop: isMobile ? '20px' : '35px', boxShadow: '0 8px 20px rgba(16, 185, 129, 0.08)', flexDirection: isMobile ? 'column' : 'row'
 });
 
-const confirmedSubmissionCompletadaStyle = (c) => ({
-  ...confirmedSubmissionStyle(c),
+const confirmedSubmissionCompletadaStyle = (c, isMobile) => ({
+  ...confirmedSubmissionStyle(c, isMobile),
   border: `2px solid ${c.primary}`,
   backgroundColor: '#eff6ff'
 });
@@ -976,8 +1068,108 @@ const notaBadgeStyle = (c) => ({
   whiteSpace: 'nowrap'
 });
 
-const emptyState = (c) => ({
-  padding: '100px', textAlign: 'center', color: c.textLight, 
-  border: `4px dashed ${c.border}`, borderRadius: '40px', 
-  fontStyle: 'italic', fontSize: '1.3rem', fontWeight: '600'
+const emptyState = (c, isMobile) => ({
+  padding: isMobile ? '50px 20px' : '100px', textAlign: 'center', color: c.textLight, 
+  border: `4px dashed ${c.border}`, borderRadius: isMobile ? '20px' : '40px', 
+  fontStyle: 'italic', fontSize: isMobile ? '1rem' : '1.3rem', fontWeight: '600'
+});
+
+const footerStyle = (c, isMobile) => ({
+  backgroundColor: c.card,
+  borderTop: `2px solid ${c.border}`,
+  padding: isMobile ? '30px 20px' : '50px 40px',
+  marginTop: '60px',
+  boxShadow: '0 -4px 20px rgba(0,0,0,0.03)'
+});
+
+const footerContentStyle = (isMobile) => ({
+  maxWidth: '1000px',
+  margin: '0 auto',
+  display: 'grid',
+  gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
+  gap: isMobile ? '30px' : '40px'
+});
+
+const footerSectionStyle = (isMobile) => ({
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '15px'
+});
+
+const footerTitleStyle = (c) => ({
+  margin: '0 0 10px 0',
+  fontSize: '1.1rem',
+  color: c.textDark,
+  fontWeight: '800',
+  letterSpacing: '-0.5px'
+});
+
+const footerQuoteStyle = (c) => ({
+  margin: '0 0 8px 0',
+  fontSize: '0.95rem',
+  color: c.textDark,
+  fontStyle: 'italic',
+  lineHeight: '1.6'
+});
+
+const footerAuthorStyle = (c) => ({
+  margin: '0',
+  fontSize: '0.85rem',
+  color: c.primary,
+  fontWeight: '700'
+});
+
+const footerFormStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '12px'
+};
+
+const footerInputStyle = (c) => ({
+  padding: '12px',
+  borderRadius: '8px',
+  border: `1px solid ${c.border}`,
+  fontSize: '0.9rem',
+  boxSizing: 'border-box',
+  fontFamily: 'inherit'
+});
+
+const footerTextareaStyle = (c) => ({
+  ...footerInputStyle(c),
+  resize: 'none',
+  minHeight: '80px'
+});
+
+const footerButtonStyle = (c) => ({
+  padding: '12px 20px',
+  backgroundColor: c.primary,
+  color: 'white',
+  border: 'none',
+  borderRadius: '8px',
+  fontWeight: '700',
+  cursor: 'pointer',
+  fontSize: '0.9rem',
+  transition: 'all 0.2s ease'
+});
+
+const instagramButtonStyle = (c, isMobile) => ({
+  display: 'inline-flex',
+  alignItems: 'center',
+  padding: isMobile ? '12px 20px' : '14px 24px',
+  borderRadius: '12px',
+  textDecoration: 'none',
+  fontSize: isMobile ? '0.9rem' : '1rem',
+  fontWeight: '700',
+  background: 'linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)',
+  color: 'white',
+  transition: 'all 0.3s ease',
+  boxShadow: '0 4px 15px rgba(220, 39, 67, 0.3)'
+});
+
+const footerBottomStyle = (c) => ({
+  maxWidth: '1000px',
+  margin: '40px auto 0 auto',
+  paddingTop: '20px',
+  borderTop: `1px solid ${c.border}`,
+  textAlign: 'center'
 });
