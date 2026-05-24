@@ -4,6 +4,7 @@ import {
   collection, query, where, onSnapshot, orderBy, doc, getDoc, addDoc, serverTimestamp 
 } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
+import MissatgesPrivats from './MissatgesPrivats';
 
 const EXTENSIONS_IMATGE = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg', 'heic'];
 
@@ -391,6 +392,7 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
           <div style={navLinksArea}>
             <button onClick={() => setView('inici')} style={navLink(view === 'inici', colors)}>Inici</button>
             <button onClick={() => setView('materials')} style={navLink(view === 'materials', colors)}>Aula Virtual</button>
+            <button onClick={() => setView('consultes')} style={navLink(view === 'consultes', colors)}>💬 Consultes Privades</button>
             <button onClick={() => signOut(auth)} style={logoutBtn(colors)}>Tancar sessió</button>
           </div>
         </div>
@@ -662,6 +664,12 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
                 )}
               </div>
             )}
+          </div>
+        )}
+
+        {view === 'consultes' && (
+          <div className="fade-in">
+            <MissatgesPrivats user={user} isAdmin={false} colors={colors} />
           </div>
         )}
       </main>

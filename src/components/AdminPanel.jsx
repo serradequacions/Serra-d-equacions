@@ -16,6 +16,7 @@ import {
   where,
   updateDoc
 } from 'firebase/firestore';
+import MissatgesPrivats from './MissatgesPrivats';
 
 const EXTENSIONS_IMATGE = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg', 'heic'];
 
@@ -525,6 +526,7 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
             <button onClick={() => setActiveTab('trameses')} style={tabButtonStyle(activeTab === 'trameses', colors)}>
               Entregues {trameses.length > 0 && <span style={counterBadge}>{trameses.length}</span>}
             </button>
+            <button onClick={() => setActiveTab('missatges')} style={tabButtonStyle(activeTab === 'missatges', colors)}>💬 Missatges Alumnes</button>
           </div>
 
           {activeTab === 'trameses' && (
@@ -652,6 +654,10 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
                 </div>
               ))}
             </div>
+          )}
+
+          {activeTab === 'missatges' && (
+            <MissatgesPrivats user={auth.currentUser} isAdmin={true} colors={colors} />
           )}
         </main>
       </div>
