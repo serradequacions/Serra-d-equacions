@@ -5,25 +5,7 @@ import {
 } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import MissatgesPrivats from './MissatgesPrivats';
-
-const EXTENSIONS_IMATGE = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg', 'heic'];
-
-const obtenirTipusRecursCloudinary = (fileName) => {
-  const ext = (fileName || '').split('.').pop()?.toLowerCase() || '';
-  return EXTENSIONS_IMATGE.includes(ext) ? 'image' : 'raw';
-};
-
-const normalitzarUrlCloudinary = (url, fileName = '') => {
-  if (!url || typeof url !== 'string') return '';
-  const tipus = obtenirTipusRecursCloudinary(fileName);
-  if (tipus === 'raw' && url.includes('/image/upload/')) {
-    return url.replace('/image/upload/', '/raw/upload/');
-  }
-  if (tipus === 'image' && url.includes('/raw/upload/')) {
-    return url.replace('/raw/upload/', '/image/upload/');
-  }
-  return url;
-};
+import { normalitzarUrlCloudinary, obtenirTipusRecursCloudinary } from '../utils/cloudinary';
 
 const obtenirUrlCloudinary = (tramesa) =>
   normalitzarUrlCloudinary(tramesa?.urlCloudinary || tramesa?.fileUrl || '', tramesa?.fileName);
@@ -58,15 +40,20 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
   const [selectedMaterial, setSelectedMaterial] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [menuMobilObert, setMenuMobilObert] = useState(false);
   const [contactForm, setContactForm] = useState({ nom: '', correu: '', missatge: '' });
   const [enviatAmbExit, setEnviatAmbExit] = useState(false);
   const [carregantContacte, setCarregantContacte] = useState(false);
+  const [avisosLlegits, setAvisosLlegits] = useState(() => {
+    const guardats = localStorage.getItem('avisosLlegits');
+    return guardats ? JSON.parse(guardats) : [];
+  });
+  const [loadingSeguretat, setLoadingSeguretat] = useState(true);
+  const [errorSeguretat, setErrorSeguretat] = useState(null);
   
   // --- ESTATS DE TRAMESA I CLOUDINARY ---
   const [isUploading, setIsUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState('');
-  const [entregaActual, setEntregaActual] = useState(null);
   const fileInputRef = useRef(null);
 
   const WORKER_URL = 'https://brevo-proxy.serradequacions.workers.dev';
@@ -111,9 +98,40 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
     return { tasques, completades, total, percent, perTema };
   }, [materials, entregasAlumne]);
 
+  // --- VERIFICACIÓ DE SEGURETAT DE L'ALUMNE ---
+  useEffect(() => {
+    const verificarSessioAlumne = async () => {
+      try {
+        const currentUser = auth.currentUser;
+        if (!currentUser) {
+          setErrorSeguretat('No hi ha cap sessió activa. Inicia sessió per accedir al Campus.');
+          setLoadingSeguretat(false);
+          return;
+        }
+
+        const docRef = doc(db, 'usuaris', currentUser.uid);
+        const docSnap = await getDoc(docRef);
+        
+        if (!docSnap.exists()) {
+          setErrorSeguretat('Perfil d\'usuari no trobat. Contacta amb l\'administració.');
+          setLoadingSeguretat(false);
+          return;
+        }
+
+        setLoadingSeguretat(false);
+      } catch (error) {
+        console.error('Error verificant sessió de l\'alumne:', error);
+        setErrorSeguretat('Error de connexió. Torna-ho a provar.');
+        setLoadingSeguretat(false);
+      }
+    };
+
+    verificarSessioAlumne();
+  }, []);
+
   // --- EFECTE: CÀRREGA DE DADES DE L'ALUMNE ---
   useEffect(() => {
-    if (!user) return;
+    if (!user || loadingSeguretat || errorSeguretat) return;
 
     const handleResize = () => {
       setIsMobile(window.innerWidth < 768);
@@ -125,10 +143,10 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
     return () => {
       window.removeEventListener('resize', handleResize);
     };
-  }, []);
+  }, [user, loadingSeguretat, errorSeguretat]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || loadingSeguretat || errorSeguretat) return;
 
     const fetchStudentData = async () => {
       try {
@@ -141,7 +159,7 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
           subscribeToContent(data.curs);
         } else {
           const fallbackData = { 
-            nom: user.displayName || user.email.split('@')[0], 
+            nom: user.displayName || user.email?.split('@')[0] || 'Alumne', 
             curs: "Sense Assignar" 
           };
           setStudentData(fallbackData);
@@ -182,47 +200,34 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
     };
 
     fetchStudentData();
-  }, [user]);
+  }, [user, loadingSeguretat, errorSeguretat]);
 
   // --- MONITORITZAR TOTES LES ENTREGUES DE L'ALUMNE ---
   useEffect(() => {
-    if (!user) return;
+    if (!user || loadingSeguretat || errorSeguretat) return;
 
-    const q = query(
-      collection(db, "trameses"),
-      where("alumneId", "==", user.uid),
-      orderBy("data", "desc")
-    );
-
-    const unsub = onSnapshot(q, (snap) => {
-      setEntregasAlumne(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-    });
-
-    return () => unsub();
-  }, [user]);
-
-  // --- MONITORITZAR ENTREGUES DE L'ALUMNE (material seleccionat) ---
-  useEffect(() => {
-    if (selectedMaterial && user) {
+    try {
       const q = query(
         collection(db, "trameses"),
-        where("materialId", "==", selectedMaterial.id),
         where("alumneId", "==", user.uid),
         orderBy("data", "desc")
       );
-      
+
       const unsub = onSnapshot(q, (snap) => {
-        if (!snap.empty) {
-          setEntregaActual({ id: snap.docs[0].id, ...snap.docs[0].data() });
-        } else {
-          setEntregaActual(null);
-        }
+        setEntregasAlumne(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
       });
+
       return () => unsub();
-    } else {
-      setEntregaActual(null);
+    } catch (error) {
+      console.error('Error monitoritzant entregues:', error);
     }
-  }, [selectedMaterial, user]);
+  }, [user, loadingSeguretat, errorSeguretat]);
+
+  // --- FILTRAR ENTREGA DEL MATERIAL ACTIU EN MEMÒRIA ---
+  const entregaActual = useMemo(() => {
+    if (!selectedMaterial || !user) return null;
+    return entregasAlumne.find((e) => e.materialId === selectedMaterial.id && e.alumneId === user.uid) || null;
+  }, [selectedMaterial, user, entregasAlumne]);
 
   // --- NETEJA D'ESTAT DE PUJADA EN CANVIAR DE MATERIAL ---
   useEffect(() => {
@@ -260,6 +265,39 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
         enviatDesDe: 'Dashboard',
         dataEnviament: serverTimestamp()
       });
+
+      await fetch(WORKER_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          emails: ['serradequacions@gmail.com'],
+          tipus: 'contacte',
+          titol: 'Nova consulta des del Footer - Serra d\'Equacions',
+          subject: 'Nova consulta des del Footer - Serra d\'Equacions',
+          contingut: [
+            `<strong>Nom:</strong> ${contactForm.nom}`,
+            '',
+            `<strong>Email:</strong> ${contactForm.correu}`,
+            '',
+            `<strong>Missatge:</strong>`,
+            contactForm.missatge,
+            '',
+            `<em>Enviat des de: Dashboard de l\'Alumne</em>`
+          ].join('<br>'),
+          content: [
+            `<strong>Nom:</strong> ${contactForm.nom}`,
+            '',
+            `<strong>Email:</strong> ${contactForm.correu}`,
+            '',
+            `<strong>Missatge:</strong>`,
+            contactForm.missatge,
+            '',
+            `<em>Enviat des de: Dashboard de l\'Alumne</em>`
+          ].join('<br>'),
+          url: 'https://serradequacions.github.io/Serra-d-equacions/'
+        })
+      });
+
       setEnviatAmbExit(true);
       setContactForm({ nom: '', correu: '', missatge: '' });
     } catch (error) {
@@ -275,10 +313,31 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
     setContactForm({ nom: '', correu: '', missatge: '' });
   };
 
+  const handleMarcarComLlegit = (avisoId) => {
+    const nousLlegits = [...avisosLlegits, avisoId];
+    setAvisosLlegits(nousLlegits);
+    localStorage.setItem('avisosLlegits', JSON.stringify(nousLlegits));
+  };
+
+  const esMaterialSolucionari = (material) => {
+    const titolLower = (material.titol || '').toLowerCase();
+    return titolLower.includes('solució') || titolLower.includes('solucionari') || titolLower.includes('solucio');
+  };
+
+  const esSolucionariDesbloquejat = (material) => {
+    if (!esMaterialSolucionari(material)) return true;
+    const entrega = obtenirEntregaPerMaterial(material.id);
+    return entrega && entrega.estat === 'completada';
+  };
+
   // --- LÒGICA DE NOTIFICACIÓ ---
   const enviarNotificacioEmail = async (nomArxiu, titolTasca) => {
     try {
-      const nomPerEmail = studentData?.nom || user.displayName || user.email;
+      if (!auth.currentUser?.uid) {
+        console.warn('No hi ha usuari autenticat per enviar notificació');
+        return;
+      }
+      const nomPerEmail = studentData?.nom || user?.displayName || user?.email || 'Alumne';
       await fetch(WORKER_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -346,8 +405,14 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
 
       setUploadStatus('Finalitzant entrega...');
 
+      if (!auth.currentUser?.uid) {
+        setUploadStatus('❌ Error: sessió no vàlida. Inicia sessió de nou.');
+        resetUploadInput();
+        return;
+      }
+
       const dadesEntrega = {
-        alumneNom: studentData?.nom || user.displayName || user.email || "Alumne",
+        alumneNom: studentData?.nom || user?.displayName || user?.email || "Alumne",
         alumneId: user.uid,
         curs: studentData?.curs || "Curs no especificat",
         alumneCurs: studentData?.curs || "Curs no especificat",
@@ -382,19 +447,28 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
     const entrega = obtenirEntregaPerMaterial(m.id);
     const completada = esTasca(m) && esEntregaCompletada(entrega);
     const lliuradaPendent = esTasca(m) && entrega && !completada;
+    const esSolucionari = esMaterialSolucionari(m);
+    const desbloquejat = esSolucionariDesbloquejat(m);
 
     return (
       <div
         key={m.id}
-        onClick={() => { setSelectedMaterial(m); setView('detall'); }}
-        style={completada ? materialRowCompletadaStyle(colors, isMobile) : materialRowStyle(colors, isMobile)}
+        onClick={() => { if (desbloquejat) { setSelectedMaterial(m); setView('detall'); } }}
+        style={{
+          ...(completada ? materialRowCompletadaStyle(colors, isMobile) : materialRowStyle(colors, isMobile)),
+          cursor: desbloquejat ? 'pointer' : 'not-allowed',
+          opacity: desbloquejat ? 1 : 0.7
+        }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '22px' }}>
-          <span style={{ fontSize: '2rem' }}>{APP_CONFIG.tipusIcons[m.tipus] || '📄'}</span>
+          <span style={{ fontSize: '2rem' }}>{esSolucionari && !desbloquejat ? '🔒' : (APP_CONFIG.tipusIcons[m.tipus] || '📄')}</span>
           <div>
             <div style={{ fontWeight: '800', color: colors.textDark, fontSize: '1.15rem' }}>{m.titol}</div>
             <div style={{ fontSize: '0.8rem', color: colors.textLight, textTransform: 'uppercase', fontWeight: '800', marginTop: '4px' }}>
               {m.tipus}
+              {esSolucionari && !desbloquejat && (
+                <span style={{ marginLeft: '10px', color: colors.danger }}>· Bloquejat</span>
+              )}
               {completada && (
                 <span style={{ marginLeft: '10px', color: colors.success }}>· Tasca Completada</span>
               )}
@@ -410,6 +484,11 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
                 Nota: {entrega.nota}/10
               </div>
             )}
+            {esSolucionari && !desbloquejat && (
+              <div style={{ fontSize: '0.75rem', color: colors.textLight, fontWeight: '600', marginTop: '6px' }}>
+                Es desbloqueja en puntuar la teva entrega
+              </div>
+            )}
           </div>
         </div>
         <div style={{ textAlign: 'right' }}>
@@ -418,6 +497,79 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
       </div>
     );
   };
+
+  // --- PANTALLA DE CÀRREGA DE SEGURETAT ---
+  if (loadingSeguretat) {
+    return (
+      <div style={{
+        backgroundColor: colors.bg,
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontFamily: '"Inter", sans-serif'
+      }}>
+        {logoImg && <img src={logoImg} alt="Logo" style={{ height: '80px', borderRadius: '16px', marginBottom: '30px' }} />}
+        <div className="spinner-security"></div>
+        <p style={{ fontWeight: '600', color: colors.textLight, marginTop: '20px', fontSize: '1.1rem' }}>
+          Verificant seguretat...
+        </p>
+        <style>{`
+          .spinner-security {
+            width: 50px;
+            height: 50px;
+            border: 5px solid #e2e8f0;
+            border-top-color: #2563eb;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+          }
+          @keyframes spin { to { transform: rotate(360deg); } }
+        `}</style>
+      </div>
+    );
+  }
+
+  if (errorSeguretat) {
+    return (
+      <div style={{
+        backgroundColor: colors.bg,
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontFamily: '"Inter", sans-serif',
+        padding: '20px',
+        textAlign: 'center'
+      }}>
+        {logoImg && <img src={logoImg} alt="Logo" style={{ height: '80px', borderRadius: '16px', marginBottom: '30px' }} />}
+        <div style={{ fontSize: '4rem', marginBottom: '20px' }}>⚠️</div>
+        <h2 style={{ fontSize: '1.8rem', fontWeight: '900', color: colors.danger, marginBottom: '15px' }}>
+          Error de Connexió
+        </h2>
+        <p style={{ fontSize: '1.1rem', color: colors.textLight, lineHeight: '1.6', maxWidth: '500px' }}>
+          {errorSeguretat}
+        </p>
+        <button
+          onClick={() => window.location.reload()}
+          style={{
+            marginTop: '30px',
+            padding: '14px 28px',
+            backgroundColor: colors.primary,
+            color: 'white',
+            border: 'none',
+            borderRadius: '12px',
+            fontWeight: '700',
+            cursor: 'pointer',
+            fontSize: '1rem'
+          }}
+        >
+          Reintentar
+        </button>
+      </div>
+    );
+  }
 
   // --- PANTALLA DE CÀRREGA ---
   if (loading) return (
@@ -442,12 +594,28 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
           </div>
           <div style={navLinksArea}>
             {isMobile && (
-              <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} style={{ padding: '10px 15px', backgroundColor: colors.primary, color: 'white', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', fontSize: '1.2rem' }}>☰</button>
+              <button 
+                onClick={() => setMenuMobilObert(!menuMobilObert)} 
+                style={{ 
+                  padding: '12px 16px', 
+                  backgroundColor: colors.primary, 
+                  color: 'white', 
+                  border: 'none', 
+                  borderRadius: '10px', 
+                  fontWeight: '700', 
+                  cursor: 'pointer', 
+                  fontSize: '1.4rem',
+                  boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                {menuMobilObert ? '✕' : '☰'}
+              </button>
             )}
-            <div style={{ display: isMobile ? (mobileMenuOpen ? 'flex' : 'none') : 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? '10px' : '40px', alignItems: isMobile ? 'flex-start' : 'center', position: isMobile ? 'absolute' : 'static', top: isMobile ? '100%' : 'auto', left: isMobile ? '0' : 'auto', right: isMobile ? '0' : 'auto', backgroundColor: isMobile ? 'white' : 'transparent', padding: isMobile ? '20px' : '0', borderBottom: isMobile ? `1px solid ${colors.border}` : 'none', boxShadow: isMobile ? '0 4px 20px rgba(0,0,0,0.1)' : 'none', zIndex: isMobile ? '1000' : 'auto' }}>
-              <button onClick={() => { setView('inici'); setMobileMenuOpen(false); }} style={navLink(view === 'inici', colors)}>Inici</button>
-              <button onClick={() => { setView('materials'); setMobileMenuOpen(false); }} style={navLink(view === 'materials', colors)}>Aula Virtual</button>
-              <button onClick={() => { setView('consultes'); setMobileMenuOpen(false); }} style={navLink(view === 'consultes', colors)}>💬 Consultes Privades</button>
+            <div style={{ display: isMobile ? (menuMobilObert ? 'flex' : 'none') : 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? '10px' : '40px', alignItems: isMobile ? 'flex-start' : 'center', position: isMobile ? 'absolute' : 'static', top: isMobile ? '100%' : 'auto', left: isMobile ? '0' : 'auto', right: isMobile ? '0' : 'auto', backgroundColor: isMobile ? 'white' : 'transparent', padding: isMobile ? '20px' : '0', borderBottom: isMobile ? `1px solid ${colors.border}` : 'none', boxShadow: isMobile ? '0 4px 20px rgba(0,0,0,0.1)' : 'none', zIndex: isMobile ? '1000' : 'auto' }}>
+              <button onClick={() => { setView('inici'); setMenuMobilObert(false); }} style={navLink(view === 'inici', colors)}>Inici</button>
+              <button onClick={() => { setView('materials'); setMenuMobilObert(false); }} style={navLink(view === 'materials', colors)}>Aula Virtual</button>
+              <button onClick={() => { setView('consultes'); setMenuMobilObert(false); }} style={navLink(view === 'consultes', colors)}>💬 Consultes Privades</button>
               <button onClick={() => signOut(auth)} style={logoutBtn(colors)}>Tancar sessió</button>
             </div>
           </div>
@@ -532,17 +700,36 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
             {avisos.length === 0 ? (
               <div style={emptyState(colors, isMobile)}>No hi ha avisos pendents.</div>
             ) : (
-              avisos.map(a => (
-                <div key={a.id} style={cardStyle(colors, isMobile)}>
-                  <div style={{ display: 'flex', gap: '25px' }}>
-                    <div style={iconCircle(colors, '#eff6ff', colors.primary)}>📢</div>
-                    <div style={{ flex: 1 }}>
-                      <div style={textBodyStyle}>{a.contingut}</div>
-                      <div style={dateStyle}>{a.data?.toDate().toLocaleDateString('ca-ES', { day: 'numeric', month: 'long' })}</div>
+              avisos
+                .filter(a => !avisosLlegits.includes(a.id))
+                .map(a => (
+                  <div key={a.id} style={cardStyle(colors, isMobile)}>
+                    <div style={{ display: 'flex', gap: '25px' }}>
+                      <div style={iconCircle(colors, '#eff6ff', colors.primary)}>📢</div>
+                      <div style={{ flex: 1 }}>
+                        <div style={textBodyStyle}>{a.contingut}</div>
+                        <div style={dateStyle}>{a.data?.toDate().toLocaleDateString('ca-ES', { day: 'numeric', month: 'long' })}</div>
+                      </div>
+                      <button
+                        onClick={() => handleMarcarComLlegit(a.id)}
+                        style={{
+                          padding: '8px 12px',
+                          backgroundColor: colors.success,
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '8px',
+                          fontWeight: '700',
+                          cursor: 'pointer',
+                          fontSize: '0.85rem',
+                          transition: 'all 0.2s ease',
+                          whiteSpace: 'nowrap'
+                        }}
+                      >
+                        ✓ Llegit
+                      </button>
                     </div>
                   </div>
-                </div>
-              ))
+                ))
             )}
           </div>
         )}
@@ -618,17 +805,36 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
             </div>
 
             {selectedMaterial.url && (
-              <button 
-                onClick={() => handleOpenFile(selectedMaterial.url)} 
-                style={{...attachmentCardStyle(colors, isMobile), width: '100%', border: 'none', cursor: 'pointer', textAlign: isMobile ? 'center' : 'left'}}
-              >
-                <div style={{ fontSize: '2rem' }}>📂</div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: '800', fontSize: '1.1rem' }}>Descarregar recurs adjunt</div>
-                  <div style={{ fontSize: '0.9rem', opacity: 0.7 }}>Fitxer original compartit pel professorat</div>
+              esSolucionariDesbloquejat(selectedMaterial) ? (
+                <button 
+                  onClick={() => handleOpenFile(selectedMaterial.url)} 
+                  style={{...attachmentCardStyle(colors, isMobile), width: '100%', border: 'none', cursor: 'pointer', textAlign: isMobile ? 'center' : 'left'}}
+                >
+                  <div style={{ fontSize: '2rem' }}>📂</div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: '800', fontSize: '1.1rem' }}>Descarregar recurs adjunt</div>
+                    <div style={{ fontSize: '0.9rem', opacity: 0.7 }}>Fitxer original compartit pel professorat</div>
+                  </div>
+                  <div style={{ fontSize: '1.5rem', color: colors.primary }}>↗</div>
+                </button>
+              ) : (
+                <div 
+                  style={{
+                    ...attachmentCardStyle(colors, isMobile),
+                    width: '100%',
+                    opacity: 0.6,
+                    cursor: 'not-allowed',
+                    backgroundColor: '#f1f5f9'
+                  }}
+                >
+                  <div style={{ fontSize: '2rem' }}>🔒</div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: '800', fontSize: '1.1rem', color: colors.textLight }}>Solucionari bloquejat</div>
+                    <div style={{ fontSize: '0.9rem', opacity: 0.8, marginTop: '4px' }}>Es desbloqueja en puntuar la teva entrega</div>
+                  </div>
+                  <div style={{ fontSize: '1.5rem', color: colors.textLight }}>🔒</div>
                 </div>
-                <div style={{ fontSize: '1.5rem', color: colors.primary }}>↗</div>
-              </button>
+              )
             )}
 
             {selectedMaterial.tipus?.toLowerCase().includes('tasca') && (
@@ -636,12 +842,29 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
                 {tascaCompletada && (
                   <div style={tascaCompletadaBannerStyle(colors, isMobile)}>
                     <span style={{ fontSize: '1.5rem' }}>✅</span>
-                    <div>
+                    <div style={{ flex: 1 }}>
                       <div style={{ fontWeight: '900', fontSize: '1.1rem', color: colors.success }}>Tasca Completada</div>
                       <div style={{ fontSize: '0.9rem', color: colors.textLight, marginTop: '4px', fontWeight: '600' }}>
                         El professor ha revisat i qualificat el teu lliurament.
                         {teNota && ` La teva nota és ${entregaActual.nota}/10.`}
                       </div>
+                      {entregaActual.comentariProfessor && (
+                        <div style={{
+                          marginTop: '12px',
+                          padding: '12px 16px',
+                          backgroundColor: '#f0fdf4',
+                          borderLeft: `4px solid ${colors.success}`,
+                          borderRadius: '8px',
+                          fontStyle: 'italic',
+                          fontSize: '0.9rem',
+                          color: colors.textDark,
+                          lineHeight: '1.6'
+                        }}>
+                          <strong style={{ fontStyle: 'normal', color: colors.success }}>💬 Feedback del professor:</strong>
+                          <br />
+                          {entregaActual.comentariProfessor}
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -730,6 +953,18 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
         )}
       </main>
 
+      {isMobile && menuMobilObert && (
+        <div 
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.5)',
+            zIndex: 999,
+            onClick: () => setMenuMobilObert(false)
+          }}
+        />
+      )}
+
       <footer style={footerStyle(colors, isMobile)}>
         <div style={footerContentStyle(isMobile)}>
           <div style={footerSectionStyle(isMobile)}>
@@ -752,7 +987,7 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
                 <div style={{ fontSize: '2.5rem', marginBottom: '12px' }}>✓</div>
                 <h5 style={{ margin: '0 0 8px 0', fontSize: '1rem', color: colors.success, fontWeight: '800' }}>Missatge enviat correctament!</h5>
                 <p style={{ margin: '0 0 16px 0', fontSize: '0.85rem', color: colors.textLight, lineHeight: '1.5' }}>
-                  Ens posarem en contacte amb tu a serradequacions@gmail.com al més aviat possible.
+                  Ens posarem en contacte amb tu a {contactForm.correu} al més aviat possible.
                 </p>
                 <button onClick={handleResetContacte} style={footerResetButtonStyle(colors)}>
                   Enviar un altre missatge

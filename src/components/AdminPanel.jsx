@@ -17,31 +17,25 @@ import {
   updateDoc
 } from 'firebase/firestore';
 import MissatgesPrivats from './MissatgesPrivats';
-
-const EXTENSIONS_IMATGE = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg', 'heic'];
-
-const obtenirTipusRecursCloudinary = (fileName) => {
-  const ext = (fileName || '').split('.').pop()?.toLowerCase() || '';
-  return EXTENSIONS_IMATGE.includes(ext) ? 'image' : 'raw';
-};
-
-const normalitzarUrlCloudinary = (url, fileName = '') => {
-  if (!url || typeof url !== 'string') return '';
-  const tipus = obtenirTipusRecursCloudinary(fileName);
-  if (tipus === 'raw' && url.includes('/image/upload/')) {
-    return url.replace('/image/upload/', '/raw/upload/');
-  }
-  if (tipus === 'image' && url.includes('/raw/upload/')) {
-    return url.replace('/raw/upload/', '/image/upload/');
-  }
-  return url;
-};
+import { normalitzarUrlCloudinary, obtenirTipusRecursCloudinary } from '../utils/cloudinary';
 
 const obtenirUrlCloudinaryTramesa = (tramesa) =>
   normalitzarUrlCloudinary(tramesa?.urlCloudinary || tramesa?.fileUrl || '', tramesa?.fileName);
 
-function TaulaRevisioTrameses({ entregues, colors, onGuardarNota }) {
+function TaulaRevisioTrameses({ entregues, colors, onGuardarNota, onGuardarComentari, isMobile }) {
   if (entregues.length === 0) {
+    if (isMobile) {
+      return (
+        <div style={{
+          padding: '40px 15px',
+          textAlign: 'center',
+          color: colors.textLight,
+          fontStyle: 'italic'
+        }}>
+          Cap alumne ha lliurat aquesta tasca encara.
+        </div>
+      );
+    }
     return (
       <tr>
         <td
@@ -57,6 +51,115 @@ function TaulaRevisioTrameses({ entregues, colors, onGuardarNota }) {
         </td>
       </tr>
     );
+  }
+
+  if (isMobile) {
+    return entregues.map((tramesa) => {
+      const urlCloudinary = obtenirUrlCloudinaryTramesa(tramesa);
+      const timestamp = tramesa.dataLliurament || tramesa.data;
+
+      return (
+        <div
+          key={tramesa.id}
+          style={{
+            backgroundColor: '#fff',
+            border: `1px solid ${colors.border}`,
+            borderRadius: '12px',
+            padding: '20px',
+            marginBottom: '16px',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
+          }}
+        >
+          <div style={{ marginBottom: '12px' }}>
+            <div style={{ fontWeight: '800', fontSize: '1.1rem', color: colors.textDark, marginBottom: '4px' }}>
+              {tramesa.alumneNom || 'Alumne sense nom'}
+            </div>
+            <div style={{ color: colors.primary, fontWeight: '700', fontSize: '0.9rem' }}>
+              {tramesa.alumneCurs || tramesa.curs || '—'}
+            </div>
+          </div>
+
+          <div style={{ marginBottom: '12px', color: colors.textLight, fontSize: '0.9rem' }}>
+            <strong>Data:</strong>{' '}
+            {timestamp && typeof timestamp.toDate === 'function'
+              ? timestamp.toDate().toLocaleDateString('ca-ES')
+              : 'Sense data'}
+          </div>
+
+          <div style={{ marginBottom: '16px' }}>
+            {urlCloudinary ? (
+              <a
+                href={urlCloudinary}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  color: '#2563eb',
+                  fontWeight: '700',
+                  textDecoration: 'underline',
+                  fontSize: '0.95rem',
+                  display: 'inline-block'
+                }}
+              >
+                📎 Veure Fitxer
+              </a>
+            ) : (
+              <span style={{ color: colors.textLight, fontSize: '0.85rem' }}>Sense arxiu</span>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ flex: 1 }}>
+              <label style={{ fontSize: '0.8rem', fontWeight: '700', color: colors.textLight, display: 'block', marginBottom: '6px' }}>
+                Nota (0-10):
+              </label>
+              <input
+                type="number"
+                step="0.1"
+                min="0"
+                max="10"
+                placeholder="-"
+                defaultValue={tramesa.nota ?? ''}
+                key={`nota-revisio-${tramesa.id}-${tramesa.nota ?? 'buida'}`}
+                onBlur={(e) => onGuardarNota(tramesa, e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  borderRadius: '10px',
+                  border: `1px solid ${colors.border}`,
+                  textAlign: 'center',
+                  fontWeight: '700',
+                  fontSize: '1rem',
+                  boxSizing: 'border-box'
+                }}
+              />
+            </div>
+          </div>
+
+          <div style={{ marginTop: '16px' }}>
+            <label style={{ fontSize: '0.8rem', fontWeight: '700', color: colors.textLight, display: 'block', marginBottom: '6px' }}>
+              Comentaris de correcció o retroacció:
+            </label>
+            <textarea
+              placeholder="Escriu aquí els teus comentaris per a l'alumne..."
+              defaultValue={tramesa.comentariProfessor || ''}
+              onBlur={(e) => onGuardarComentari(tramesa, e.target.value)}
+              style={{
+                width: '100%',
+                padding: '12px',
+                borderRadius: '10px',
+                border: `1px solid ${colors.border}`,
+                fontSize: '0.9rem',
+                fontFamily: 'inherit',
+                resize: 'vertical',
+                minHeight: '80px',
+                boxSizing: 'border-box',
+                backgroundColor: '#f8fafc'
+              }}
+            />
+          </div>
+        </div>
+      );
+    });
   }
 
   return entregues.map((tramesa) => {
@@ -91,22 +194,40 @@ function TaulaRevisioTrameses({ entregues, colors, onGuardarNota }) {
           )}
         </td>
         <td style={{ padding: '14px 15px' }}>
-          <input
-            type="number"
-            step="0.1"
-            min="0"
-            max="10"
-            placeholder="-"
-            defaultValue={tramesa.nota ?? ''}
-            key={`nota-revisio-${tramesa.id}-${tramesa.nota ?? 'buida'}`}
-            onBlur={(e) => onGuardarNota(tramesa, e.target.value)}
+          <div style={{ marginBottom: '8px' }}>
+            <input
+              type="number"
+              step="0.1"
+              min="0"
+              max="10"
+              placeholder="-"
+              defaultValue={tramesa.nota ?? ''}
+              key={`nota-revisio-${tramesa.id}-${tramesa.nota ?? 'buida'}`}
+              onBlur={(e) => onGuardarNota(tramesa, e.target.value)}
+              style={{
+                width: '70px',
+                padding: '8px',
+                borderRadius: '8px',
+                border: `1px solid ${colors.border}`,
+                textAlign: 'center',
+                fontWeight: '700'
+              }}
+            />
+          </div>
+          <textarea
+            placeholder="Comentari..."
+            defaultValue={tramesa.comentariProfessor || ''}
+            onBlur={(e) => onGuardarComentari(tramesa, e.target.value)}
             style={{
-              width: '70px',
+              width: '150px',
               padding: '8px',
               borderRadius: '8px',
               border: `1px solid ${colors.border}`,
-              textAlign: 'center',
-              fontWeight: '700'
+              fontSize: '0.8rem',
+              fontFamily: 'inherit',
+              resize: 'vertical',
+              minHeight: '50px',
+              boxSizing: 'border-box'
             }}
           />
         </td>
@@ -143,11 +264,14 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
   const [expandedCurs, setExpandedCurs] = useState(null);
   const [isPublishing, setIsPublishing] = useState(false);
   const [materialRevisio, setMaterialRevisio] = useState(null);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [menuMobilObert, setMenuMobilObert] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [contactForm, setContactForm] = useState({ nom: '', correu: '', missatge: '' });
   const [enviatAmbExit, setEnviatAmbExit] = useState(false);
   const [carregantContacte, setCarregantContacte] = useState(false);
+  const [comentarisProfessor, setComentarisProfessor] = useState({});
+  const [loadingSeguretat, setLoadingSeguretat] = useState(true);
+  const [errorSeguretat, setErrorSeguretat] = useState(null);
 
   const colors = {
     primary: '#2563eb',
@@ -160,6 +284,54 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
     success: '#10b981',
     accent: '#3b82f6'
   };
+
+  // --- VERIFICACIÓ DE ROL I SEGURETAT ---
+  useEffect(() => {
+    const verificarRolAdmin = async () => {
+      try {
+        const currentUser = auth.currentUser;
+        if (!currentUser) {
+          setErrorSeguretat('No hi ha cap sessió activa. Sessió tancada per seguretat.');
+          await signOut(auth);
+          setLoadingSeguretat(false);
+          return;
+        }
+
+        const docRef = doc(db, 'usuaris', currentUser.uid);
+        const docSnap = await getDoc(docRef);
+        
+        if (!docSnap.exists()) {
+          setErrorSeguretat('Perfil d\'usuari no trobat. Sessió tancada per seguretat.');
+          await signOut(auth);
+          setLoadingSeguretat(false);
+          return;
+        }
+
+        const userData = docSnap.data();
+        const rol = userData?.rol || userData?.role;
+        
+        if (rol !== 'admin' && rol !== 'professor' && rol !== 'administrador') {
+          setErrorSeguretat('No tens permisos d\'administració. Sessió tancada per seguretat.');
+          await signOut(auth);
+          setLoadingSeguretat(false);
+          return;
+        }
+
+        setLoadingSeguretat(false);
+      } catch (error) {
+        console.error('Error verificant rol d\'administració:', error);
+        setErrorSeguretat('Error de seguretat. Sessió tancada per seguretat.');
+        try {
+          await signOut(auth);
+        } catch (e) {
+          console.error('Error tancant sessió:', e);
+        }
+        setLoadingSeguretat(false);
+      }
+    };
+
+    verificarRolAdmin();
+  }, []);
 
   const esTasca = (material) => material?.tipus?.toLowerCase().includes('tasca');
 
@@ -188,6 +360,8 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
   }, [trameses, materialRevisio]);
 
   useEffect(() => {
+    if (loadingSeguretat || errorSeguretat) return;
+
     const unsubMat = onSnapshot(query(collection(db, 'materials'), orderBy('data', 'desc')), (snap) => {
       setMaterials(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     });
@@ -204,7 +378,7 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
       setTemesBD(obj);
     });
 
-    const unsubTram = onSnapshot(query(collection(db, 'trameses'), orderBy('data', 'desc')), (snap) => {
+    const unsubTram = onSnapshot(query(collection(db, 'trameses'), orderBy('data', 'desc'), limit(50)), (snap) => {
       setTrameses(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     });
 
@@ -222,10 +396,10 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
       unsubTram();
       window.removeEventListener('resize', handleResize);
     };
-  }, []);
+  }, [loadingSeguretat, errorSeguretat]);
 
   const obtenirEmailAlumne = async (alumneId) => {
-    if (!alumneId) return null;
+    if (!alumneId || !auth.currentUser?.uid) return null;
     try {
       const snap = await getDoc(doc(db, 'usuaris', alumneId));
       if (snap.exists()) {
@@ -282,18 +456,28 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
     }
   };
 
+  const handleGuardarComentari = async (tramesa, valor) => {
+    if (!tramesa?.id) return;
+    setComentarisProfessor(prev => ({
+      ...prev,
+      [tramesa.id]: valor
+    }));
+  };
+
   const handleGuardarNota = async (tramesa, valor) => {
     if (!tramesa?.id) return;
 
     const valorNet = String(valor).trim();
     const notaAnterior = tramesa.nota ?? null;
+    const comentari = comentarisProfessor[tramesa.id] || '';
 
     if (valorNet === '') {
-      if (notaAnterior === null || notaAnterior === undefined) return;
+      if (notaAnterior === null || notaAnterior === undefined && !comentari) return;
       try {
         await updateDoc(doc(db, 'trameses', tramesa.id), {
           nota: null,
-          estat: 'pendent_revisio'
+          estat: 'pendent_revisio',
+          comentariProfessor: comentari || null
         });
       } catch (e) {
         console.error('Error esborrant la nota:', e);
@@ -309,14 +493,15 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
       ? null
       : parseFloat(notaAnterior);
 
-    if (notaPreviaNum !== null && !Number.isNaN(notaPreviaNum) && notaPreviaNum === nota) {
+    if (notaPreviaNum !== null && !Number.isNaN(notaPreviaNum) && notaPreviaNum === nota && tramesa.comentariProfessor === comentari) {
       return;
     }
 
     try {
       await updateDoc(doc(db, 'trameses', tramesa.id), {
         nota,
-        estat: 'completada'
+        estat: 'completada',
+        comentariProfessor: comentari || null
       });
 
       const correuAlumne = await obtenirEmailAlumne(tramesa.alumneId);
@@ -468,6 +653,39 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
         enviatDesDe: 'Admin',
         dataEnviament: serverTimestamp()
       });
+
+      await fetch(WORKER_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          emails: ['serradequacions@gmail.com'],
+          tipus: 'contacte',
+          titol: 'Nova consulta des del Footer - Serra d\'Equacions',
+          subject: 'Nova consulta des del Footer - Serra d\'Equacions',
+          contingut: [
+            `<strong>Nom:</strong> ${contactForm.nom}`,
+            '',
+            `<strong>Email:</strong> ${contactForm.correu}`,
+            '',
+            `<strong>Missatge:</strong>`,
+            contactForm.missatge,
+            '',
+            `<em>Enviat des de: Panell d\'Administració</em>`
+          ].join('<br>'),
+          content: [
+            `<strong>Nom:</strong> ${contactForm.nom}`,
+            '',
+            `<strong>Email:</strong> ${contactForm.correu}`,
+            '',
+            `<strong>Missatge:</strong>`,
+            contactForm.missatge,
+            '',
+            `<em>Enviat des de: Panell d\'Administració</em>`
+          ].join('<br>'),
+          url: 'https://serradequacions.github.io/Serra-d-equacions/'
+        })
+      });
+
       setEnviatAmbExit(true);
       setContactForm({ nom: '', correu: '', missatge: '' });
     } catch (error) {
@@ -483,6 +701,78 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
     setContactForm({ nom: '', correu: '', missatge: '' });
   };
 
+  if (loadingSeguretat) {
+    return (
+      <div style={{
+        backgroundColor: colors.bg,
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontFamily: '"Inter", sans-serif'
+      }}>
+        {logoImg && <img src={logoImg} alt="Logo" style={{ height: '80px', borderRadius: '16px', marginBottom: '30px' }} />}
+        <div className="spinner-security"></div>
+        <p style={{ fontWeight: '600', color: colors.textLight, marginTop: '20px', fontSize: '1.1rem' }}>
+          Verificant seguretat...
+        </p>
+        <style>{`
+          .spinner-security {
+            width: 50px;
+            height: 50px;
+            border: 5px solid #e2e8f0;
+            border-top-color: #2563eb;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+          }
+          @keyframes spin { to { transform: rotate(360deg); } }
+        `}</style>
+      </div>
+    );
+  }
+
+  if (errorSeguretat) {
+    return (
+      <div style={{
+        backgroundColor: colors.bg,
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontFamily: '"Inter", sans-serif',
+        padding: '20px',
+        textAlign: 'center'
+      }}>
+        {logoImg && <img src={logoImg} alt="Logo" style={{ height: '80px', borderRadius: '16px', marginBottom: '30px' }} />}
+        <div style={{ fontSize: '4rem', marginBottom: '20px' }}>🔒</div>
+        <h2 style={{ fontSize: '1.8rem', fontWeight: '900', color: colors.danger, marginBottom: '15px' }}>
+          Accés Denegat
+        </h2>
+        <p style={{ fontSize: '1.1rem', color: colors.textLight, lineHeight: '1.6', maxWidth: '500px' }}>
+          {errorSeguretat}
+        </p>
+        <button
+          onClick={() => window.location.href = '/'}
+          style={{
+            marginTop: '30px',
+            padding: '14px 28px',
+            backgroundColor: colors.primary,
+            color: 'white',
+            border: 'none',
+            borderRadius: '12px',
+            fontWeight: '700',
+            cursor: 'pointer',
+            fontSize: '1rem'
+          }}
+        >
+          Tornar a l'inici
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div style={{ backgroundColor: colors.bg, minHeight: '100vh', padding: isMobile ? '15px' : '40px 20px', fontFamily: '"Inter", sans-serif' }}>
       <header style={{ maxWidth: '1250px', margin: '0 auto 20px auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '15px' }}>
@@ -492,14 +782,30 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           {isMobile && (
-            <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} style={{ padding: '10px 15px', backgroundColor: colors.primary, color: 'white', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', fontSize: '1.2rem' }}>☰</button>
+            <button 
+              onClick={() => setMenuMobilObert(!menuMobilObert)} 
+              style={{ 
+                padding: '12px 16px', 
+                backgroundColor: colors.primary, 
+                color: 'white', 
+                border: 'none', 
+                borderRadius: '10px', 
+                fontWeight: '700', 
+                cursor: 'pointer', 
+                fontSize: '1.4rem',
+                boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              {menuMobilObert ? '✕' : '☰'}
+            </button>
           )}
           <button onClick={() => signOut(auth)} style={logoutBtnStyle(colors)}>Tancar sessió</button>
         </div>
       </header>
 
       <div style={{ maxWidth: '1250px', margin: '0 auto', display: isMobile ? 'block' : 'grid', gridTemplateColumns: isMobile ? '1fr' : '400px 1fr', gap: '30px' }}>
-        {(!isMobile || mobileMenuOpen) && (
+        {(!isMobile || menuMobilObert) && (
           <aside style={{ marginBottom: isMobile ? '20px' : '0' }}>
             <div style={cardStyle(colors)}>
             <h3 style={cardTitleStyle(colors)}>📢 Crear Nou Avís</h3>
@@ -511,7 +817,13 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
                 </label>
               ))}
             </div>
-            <button onClick={handlePublicarAvis} disabled={isPublishing} style={primaryButtonStyle(colors)}>Publicar Avís</button>
+            <button 
+              onClick={() => { handlePublicarAvis(); if (isMobile) setMenuMobilObert(false); }} 
+              disabled={isPublishing} 
+              style={primaryButtonStyle(colors)}
+            >
+              Publicar Avís
+            </button>
           </div>
 
           <div style={cardStyle(colors)}>
@@ -565,9 +877,27 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
                 </label>
               ))}
             </div>
-            <button onClick={handlePublicarMaterial} disabled={isPublishing} style={{ ...primaryButtonStyle(colors), backgroundColor: colors.success }}>Publicar</button>
+            <button 
+              onClick={() => { handlePublicarMaterial(); if (isMobile) setMenuMobilObert(false); }} 
+              disabled={isPublishing} 
+              style={{ ...primaryButtonStyle(colors), backgroundColor: colors.success }}
+            >
+              Publicar
+            </button>
           </div>
           </aside>
+        )}
+
+        {isMobile && menuMobilObert && (
+          <div 
+            style={{
+              position: 'fixed',
+              inset: 0,
+              backgroundColor: 'rgba(15, 23, 42, 0.5)',
+              zIndex: 1000,
+              onClick: () => setMenuMobilObert(false)
+            }}
+          />
         )}
 
         <main style={cardStyle(colors)}>
@@ -581,7 +911,7 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
           </div>
 
           {activeTab === 'trameses' && (
-            <div style={{ overflowX: 'auto' }}>
+            <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
                 <thead>
                   <tr style={{ textAlign: 'left', borderBottom: `2px solid ${colors.border}`, color: colors.textLight }}>
@@ -736,25 +1066,39 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
               </button>
             </div>
 
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
-                <thead>
-                  <tr style={{ textAlign: 'left', borderBottom: `2px solid ${colors.border}`, color: colors.textLight }}>
-                    <th style={{ padding: '12px 15px' }}>Nom</th>
-                    <th style={{ padding: '12px 15px' }}>Curs</th>
-                    <th style={{ padding: '12px 15px' }}>Data</th>
-                    <th style={{ padding: '12px 15px' }}>Arxiu</th>
-                    <th style={{ padding: '12px 15px' }}>Nota</th>
-                  </tr>
-                </thead>
-                <tbody>
+            <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+              {isMobile ? (
+                <div style={{ padding: '10px 0' }}>
                   <TaulaRevisioTrameses
                     entregues={entreguesPerRevisio}
                     colors={colors}
                     onGuardarNota={handleGuardarNota}
+                    onGuardarComentari={handleGuardarComentari}
+                    isMobile={true}
                   />
-                </tbody>
-              </table>
+                </div>
+              ) : (
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+                  <thead>
+                    <tr style={{ textAlign: 'left', borderBottom: `2px solid ${colors.border}`, color: colors.textLight }}>
+                      <th style={{ padding: '12px 15px' }}>Nom</th>
+                      <th style={{ padding: '12px 15px' }}>Curs</th>
+                      <th style={{ padding: '12px 15px' }}>Data</th>
+                      <th style={{ padding: '12px 15px' }}>Arxiu</th>
+                      <th style={{ padding: '12px 15px' }}>Nota</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <TaulaRevisioTrameses
+                      entregues={entreguesPerRevisio}
+                      colors={colors}
+                      onGuardarNota={handleGuardarNota}
+                      onGuardarComentari={handleGuardarComentari}
+                      isMobile={false}
+                    />
+                  </tbody>
+                </table>
+              )}
             </div>
 
             <div style={{ marginTop: '20px', fontSize: '0.8rem', color: colors.textLight, fontWeight: '600' }}>
@@ -786,7 +1130,7 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
                 <div style={{ fontSize: '2.5rem', marginBottom: '12px' }}>✓</div>
                 <h5 style={{ margin: '0 0 8px 0', fontSize: '1rem', color: colors.success, fontWeight: '800' }}>Missatge enviat correctament!</h5>
                 <p style={{ margin: '0 0 16px 0', fontSize: '0.85rem', color: colors.textLight, lineHeight: '1.5' }}>
-                  Ens posarem en contacte amb tu a serradequacions@gmail.com al més aviat possible.
+                  Ens posarem en contacte amb tu a {contactForm.correu} al més aviat possible.
                 </p>
                 <button onClick={handleResetContacte} style={footerResetButtonStyle(colors)}>
                   Enviar un altre missatge
