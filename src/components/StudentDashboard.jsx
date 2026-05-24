@@ -484,6 +484,23 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
                 Nota: {entrega.nota}/10
               </div>
             )}
+            {completada && entrega?.comentariProfessor && (
+              <div style={{
+                marginTop: '8px',
+                padding: '10px 14px',
+                backgroundColor: '#f0fdf4',
+                borderLeft: `3px solid ${colors.success}`,
+                borderRadius: '6px',
+                fontStyle: 'italic',
+                fontSize: '0.8rem',
+                color: colors.textDark,
+                lineHeight: '1.5'
+              }}>
+                <strong style={{ fontStyle: 'normal', color: colors.success, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>💬 Feedback:</strong>
+                <br />
+                {entrega.comentariProfessor}
+              </div>
+            )}
             {esSolucionari && !desbloquejat && (
               <div style={{ fontSize: '0.75rem', color: colors.textLight, fontWeight: '600', marginTop: '6px' }}>
                 Es desbloqueja en puntuar la teva entrega
@@ -566,6 +583,50 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
           }}
         >
           Reintentar
+        </button>
+      </div>
+    );
+  }
+
+  if (!auth.currentUser?.uid) {
+    return (
+      <div style={{
+        backgroundColor: colors.bg,
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontFamily: '"Inter", sans-serif',
+        padding: '20px',
+        textAlign: 'center'
+      }}>
+        {logoImg && <img src={logoImg} alt="Logo" style={{ height: '80px', borderRadius: '16px', marginBottom: '30px' }} />}
+        <div style={{ fontSize: '4rem', marginBottom: '20px' }}>⚠️</div>
+        <h2 style={{ fontSize: '1.8rem', fontWeight: '900', color: colors.danger, marginBottom: '15px' }}>
+          Sessió No Vàlida
+        </h2>
+        <p style={{ fontSize: '1.1rem', color: colors.textLight, lineHeight: '1.6', maxWidth: '500px' }}>
+          No s'ha pogut verificar la teva identitat. Inicia sessió de nou.
+        </p>
+        <button
+          onClick={async () => {
+            await signOut(auth);
+            window.location.href = '/';
+          }}
+          style={{
+            marginTop: '30px',
+            padding: '14px 28px',
+            backgroundColor: colors.primary,
+            color: 'white',
+            border: 'none',
+            borderRadius: '12px',
+            fontWeight: '700',
+            cursor: 'pointer',
+            fontSize: '1rem'
+          }}
+        >
+          Tancar Sessió
         </button>
       </div>
     );

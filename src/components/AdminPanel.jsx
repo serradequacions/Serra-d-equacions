@@ -292,8 +292,7 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
       try {
         const currentUser = auth.currentUser;
         if (!currentUser) {
-          setErrorSeguretat('No hi ha cap sessió activa. Sessió tancada per seguretat.');
-          await signOut(auth);
+          setErrorSeguretat('No hi ha cap sessió activa. Inicia sessió per accedir al Panell d\'Administració.');
           setLoadingSeguretat(false);
           return;
         }
@@ -302,8 +301,7 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
         const docSnap = await getDoc(docRef);
         
         if (!docSnap.exists()) {
-          setErrorSeguretat('Perfil d\'usuari no trobat. Sessió tancada per seguretat.');
-          await signOut(auth);
+          setErrorSeguretat('Perfil d\'usuari no trobat. Contacta amb l\'administració.');
           setLoadingSeguretat(false);
           return;
         }
@@ -312,8 +310,7 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
         const rol = userData?.rol || userData?.role;
         
         if (rol !== 'admin' && rol !== 'professor' && rol !== 'administrador') {
-          setErrorSeguretat('No tens permisos d\'administració. Sessió tancada per seguretat.');
-          await signOut(auth);
+          setErrorSeguretat('Accés Denegat: No tens permisos de professor o administració.');
           setLoadingSeguretat(false);
           return;
         }
@@ -321,12 +318,7 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
         setLoadingSeguretat(false);
       } catch (error) {
         console.error('Error verificant rol d\'administració:', error);
-        setErrorSeguretat('Error de seguretat. Sessió tancada per seguretat.');
-        try {
-          await signOut(auth);
-        } catch (e) {
-          console.error('Error tancant sessió:', e);
-        }
+        setErrorSeguretat('Error de connexió. Torna-ho a provar.');
         setLoadingSeguretat(false);
       }
     };
@@ -755,7 +747,10 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
           {errorSeguretat}
         </p>
         <button
-          onClick={() => window.location.href = '/'}
+          onClick={async () => {
+            await signOut(auth);
+            window.location.href = '/';
+          }}
           style={{
             marginTop: '30px',
             padding: '14px 28px',
@@ -768,7 +763,51 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
             fontSize: '1rem'
           }}
         >
-          Tornar a l'inici
+          Tancar Sessió
+        </button>
+      </div>
+    );
+  }
+
+  if (!auth.currentUser?.uid) {
+    return (
+      <div style={{
+        backgroundColor: colors.bg,
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontFamily: '"Inter", sans-serif',
+        padding: '20px',
+        textAlign: 'center'
+      }}>
+        {logoImg && <img src={logoImg} alt="Logo" style={{ height: '80px', borderRadius: '16px', marginBottom: '30px' }} />}
+        <div style={{ fontSize: '4rem', marginBottom: '20px' }}>🔒</div>
+        <h2 style={{ fontSize: '1.8rem', fontWeight: '900', color: colors.danger, marginBottom: '15px' }}>
+          Sessió No Vàlida
+        </h2>
+        <p style={{ fontSize: '1.1rem', color: colors.textLight, lineHeight: '1.6', maxWidth: '500px' }}>
+          No s'ha pogut verificar la teva identitat. Inicia sessió de nou.
+        </p>
+        <button
+          onClick={async () => {
+            await signOut(auth);
+            window.location.href = '/';
+          }}
+          style={{
+            marginTop: '30px',
+            padding: '14px 28px',
+            backgroundColor: colors.primary,
+            color: 'white',
+            border: 'none',
+            borderRadius: '12px',
+            fontWeight: '700',
+            cursor: 'pointer',
+            fontSize: '1rem'
+          }}
+        >
+          Tancar Sessió
         </button>
       </div>
     );
