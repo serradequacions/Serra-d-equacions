@@ -60,6 +60,8 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
   const [isMobile, setIsMobile] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [contactForm, setContactForm] = useState({ nom: '', correu: '', missatge: '' });
+  const [enviatAmbExit, setEnviatAmbExit] = useState(false);
+  const [carregantContacte, setCarregantContacte] = useState(false);
   
   // --- ESTATS DE TRAMESA I CLOUDINARY ---
   const [isUploading, setIsUploading] = useState(false);
@@ -240,6 +242,37 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
     } else {
       window.open(url, '_blank', 'noopener,noreferrer');
     }
+  };
+
+  const handleEnviarContacte = async (e) => {
+    e.preventDefault();
+    if (!contactForm.nom || !contactForm.correu || !contactForm.missatge) {
+      alert('Si us plau, omple tots els camps.');
+      return;
+    }
+
+    setCarregantContacte(true);
+    try {
+      await addDoc(collection(db, 'contactes_footer'), {
+        nom: contactForm.nom,
+        email: contactForm.correu,
+        missatge: contactForm.missatge,
+        enviatDesDe: 'Dashboard',
+        dataEnviament: serverTimestamp()
+      });
+      setEnviatAmbExit(true);
+      setContactForm({ nom: '', correu: '', missatge: '' });
+    } catch (error) {
+      console.error('Error enviant el missatge:', error);
+      alert("No s'ha pogut enviar el missatge. Torna-ho a provar.");
+    } finally {
+      setCarregantContacte(false);
+    }
+  };
+
+  const handleResetContacte = () => {
+    setEnviatAmbExit(false);
+    setContactForm({ nom: '', correu: '', missatge: '' });
   };
 
   // --- LÒGICA DE NOTIFICACIÓ ---
@@ -709,38 +742,50 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
 
           <div style={footerSectionStyle(isMobile)}>
             <h4 style={footerTitleStyle(colors)}>📬 Contacte</h4>
-            <div style={footerFormStyle}>
-              <input
-                type="text"
-                placeholder="Nom"
-                value={contactForm.nom}
-                onChange={(e) => setContactForm({ ...contactForm, nom: e.target.value })}
-                style={footerInputStyle(colors)}
-              />
-              <input
-                type="email"
-                placeholder="Correu"
-                value={contactForm.correu}
-                onChange={(e) => setContactForm({ ...contactForm, correu: e.target.value })}
-                style={footerInputStyle(colors)}
-              />
-              <textarea
-                placeholder="Missatge"
-                value={contactForm.missatge}
-                onChange={(e) => setContactForm({ ...contactForm, missatge: e.target.value })}
-                style={footerTextareaStyle(colors)}
-                rows={3}
-              />
-              <button
-                onClick={() => {
-                  const mailtoLink = `mailto:serradequacions@gmail.com?subject=Consulta des de la web&body=Nom: ${contactForm.nom}%0ACorreu: ${contactForm.correu}%0AMissatge: ${contactForm.missatge}`;
-                  window.open(mailtoLink, '_blank');
-                }}
-                style={footerButtonStyle(colors)}
-              >
-                Enviar Missatge
-              </button>
-            </div>
+            {carregantContacte ? (
+              <div style={footerLoadingStyle(colors)}>
+                <div className="spinner-footer"></div>
+                <p style={{ margin: '10px 0 0 0', fontSize: '0.9rem', color: colors.textLight, fontWeight: '600' }}>S'està enviant el missatge...</p>
+              </div>
+            ) : enviatAmbExit ? (
+              <div style={footerSuccessStyle(colors)}>
+                <div style={{ fontSize: '2.5rem', marginBottom: '12px' }}>✓</div>
+                <h5 style={{ margin: '0 0 8px 0', fontSize: '1rem', color: colors.success, fontWeight: '800' }}>Missatge enviat correctament!</h5>
+                <p style={{ margin: '0 0 16px 0', fontSize: '0.85rem', color: colors.textLight, lineHeight: '1.5' }}>
+                  Ens posarem en contacte amb tu a serradequacions@gmail.com al més aviat possible.
+                </p>
+                <button onClick={handleResetContacte} style={footerResetButtonStyle(colors)}>
+                  Enviar un altre missatge
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleEnviarContacte} style={footerFormStyle}>
+                <input
+                  type="text"
+                  placeholder="Nom"
+                  value={contactForm.nom}
+                  onChange={(e) => setContactForm({ ...contactForm, nom: e.target.value })}
+                  style={footerInputStyle(colors)}
+                />
+                <input
+                  type="email"
+                  placeholder="Correu"
+                  value={contactForm.correu}
+                  onChange={(e) => setContactForm({ ...contactForm, correu: e.target.value })}
+                  style={footerInputStyle(colors)}
+                />
+                <textarea
+                  placeholder="Missatge"
+                  value={contactForm.missatge}
+                  onChange={(e) => setContactForm({ ...contactForm, missatge: e.target.value })}
+                  style={footerTextareaStyle(colors)}
+                  rows={3}
+                />
+                <button type="submit" disabled={carregantContacte} style={footerButtonStyle(colors)}>
+                  Enviar Missatge
+                </button>
+              </form>
+            )}
           </div>
 
           <div style={footerSectionStyle(isMobile)}>
@@ -1172,4 +1217,39 @@ const footerBottomStyle = (c) => ({
   paddingTop: '20px',
   borderTop: `1px solid ${c.border}`,
   textAlign: 'center'
+});
+
+const footerLoadingStyle = (c) => ({
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: '30px 20px',
+  backgroundColor: '#f8fafc',
+  borderRadius: '12px',
+  border: `1px solid ${c.border}`
+});
+
+const footerSuccessStyle = (c) => ({
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: '30px 20px',
+  backgroundColor: '#f0fdf4',
+  borderRadius: '12px',
+  border: `2px solid ${c.success}`,
+  textAlign: 'center'
+});
+
+const footerResetButtonStyle = (c) => ({
+  padding: '10px 20px',
+  backgroundColor: c.success,
+  color: 'white',
+  border: 'none',
+  borderRadius: '8px',
+  fontWeight: '700',
+  cursor: 'pointer',
+  fontSize: '0.85rem',
+  transition: 'all 0.2s ease'
 });
