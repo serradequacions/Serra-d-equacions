@@ -14,7 +14,8 @@ import {
   getDocs,
   getDoc,
   where,
-  updateDoc
+  updateDoc,
+  limit
 } from 'firebase/firestore';
 import MissatgesPrivats from './MissatgesPrivats';
 import { normalitzarUrlCloudinary, obtenirTipusRecursCloudinary } from '../utils/cloudinary';
