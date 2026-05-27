@@ -22,6 +22,18 @@ const esEntregaCompletada = (entrega) => {
   return teNotaValida(entrega);
 };
 
+const ENLLACES_WHATSAPP_DASHBOARD = {
+  "1r ESO": "https://chat.whatsapp.com/CLJ6MrG0qt97fkcSl3TsUx",
+  "2n ESO": "https://chat.whatsapp.com/IJBlyDSfLlK9lFTMMVC3gi",
+  "3r ESO": "https://chat.whatsapp.com/KWSeWhLFMn13cSoGm9dncC",
+  "4t ESO A": "https://chat.whatsapp.com/BcoAOGM78nCJkabOitiRnY",
+  "4t ESO B": "https://chat.whatsapp.com/DVZ7g6ekHMVDOmpDvKnEFH",
+  "1r Batxillerat Científic": "https://chat.whatsapp.com/L6YXc7jcm6kFVDhIR1i0IQ",
+  "1r batxillerat CCSS": "https://chat.whatsapp.com/JguPEEqvFEM46GBcnLTA36",
+  "1r batxillerat General": "https://chat.whatsapp.com/BRP3t5UdeWmJG8TgiXZW1M",
+  "2n Batxillerat Científic": "https://chat.whatsapp.com/IQzli2hPyNR6cyPsaGqYtH",
+  "2n batxillerat CCSS": "https://chat.whatsapp.com/CSyHjZsxz3gBzyqGyK0USI",
+};
 /**
  * StudentDashboard.jsx - VERSIÓ INTEGRAL REPARADA (+500 línies)
  * - Fix: Obertura segura de fitxers (CORS/Chrome Error).
@@ -1097,9 +1109,48 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
             </a>
           </div>
         </div>
+        {/* FOOTER PRINCIPAL DE L'ALUMNE (AMB WHATSAPP INTEGRAT I REPARAT) */}
         <div style={footerBottomStyle(colors)}>
-          <p style={{ margin: 0, fontSize: '0.8rem', color: colors.textLight }}>
-            © {new Date().getFullYear()} Serra d'Equacions. Tots els drets reservats.
+          
+          {/* BOTÓ DE WHATSAPP DINÀMIC PER CURS */}
+          {studentData?.curs && ENLLACES_WHATSAPP_DASHBOARD[studentData.curs] && (
+            <div style={{ marginBottom: '25px', textAlign: 'center' }}>
+              <a 
+                href={ENLLACES_WHATSAPP_DASHBOARD[studentData.curs]}
+                target="_blank" 
+                rel="noreferrer"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  backgroundColor: '#25d366',
+                  color: 'white',
+                  padding: '8px 18px',
+                  borderRadius: '24px',
+                  textDecoration: 'none',
+                  fontWeight: '700',
+                  fontSize: '0.8rem',
+                  boxShadow: '0 4px 12px rgba(37, 211, 102, 0.2)',
+                  transition: 'all 0.2s ease-in-out'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'scale(1.03)';
+                  e.currentTarget.style.backgroundColor = '#1ebd59';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'scale(1)';
+                  e.currentTarget.style.backgroundColor = '#25d366';
+                }}
+              >
+                <span style={{ fontSize: '1rem' }}>💬</span> Entrar al grup de WhatsApp de {studentData.curs}
+              </a>
+            </div>
+          )}
+          <p style={{ margin: '0', fontSize: '0.85rem', color: colors.textLight }}>
+            &copy; {new Date().getFullYear()} Serra d'Equacions — Alliberant el potencial matemàtic.
+          </p>
+          <p style={{ margin: '5px 0 0 0', fontSize: '0.75rem', color: colors.textLight, opacity: 0.7 }}>
+            Desenvolupat de forma nativa per a optimitzar el rendiment acadèmic.
           </p>
         </div>
       </footer>
