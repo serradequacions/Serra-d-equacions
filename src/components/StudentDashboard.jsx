@@ -7,6 +7,17 @@ import { signOut } from 'firebase/auth';
 import MissatgesPrivats from './MissatgesPrivats';
 import { normalitzarUrlCloudinary, obtenirTipusRecursCloudinary } from '../utils/cloudinary';
 
+const CLOUDINARY_URL = 'https://api.cloudinary.com/v1_1/ducevp5vb/image/upload';
+const CLOUDINARY_UPLOAD_PRESET = 'tasques_alumnes'; // Preset Cloudinary configurat com a 'unsigned'
+
+const obtenirUrlPujadaCloudinary = (fileName) => {
+  const tipus = obtenirTipusRecursCloudinary(fileName);
+  if (tipus === 'raw') {
+    return CLOUDINARY_URL.replace('/image/upload', '/raw/upload');
+  }
+  return CLOUDINARY_URL;
+};
+
 const obtenirUrlCloudinary = (tramesa) =>
   normalitzarUrlCloudinary(tramesa?.urlCloudinary || tramesa?.fileUrl || '', tramesa?.fileName);
 
@@ -64,9 +75,12 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
   const [errorSeguretat, setErrorSeguretat] = useState(null);
   
   // --- ESTATS DE TRAMESA I CLOUDINARY ---
-  const [isUploading, setIsUploading] = useState(false);
+  const [uploadingTascaId, setUploadingTascaId] = useState(null);
+  const [uploadError, setUploadError] = useState('');
   const [uploadStatus, setUploadStatus] = useState('');
   const fileInputRef = useRef(null);
+
+  const isUploading = uploadingTascaId === selectedMaterial?.id;
 
   const WORKER_URL = 'https://brevo-proxy.serradequacions.workers.dev';
 
@@ -244,7 +258,8 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
   // --- NETEJA D'ESTAT DE PUJADA EN CANVIAR DE MATERIAL ---
   useEffect(() => {
     setUploadStatus('');
-    setIsUploading(false);
+    setUploadError('');
+    setUploadingTascaId(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -371,65 +386,66 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
     }
   };
 
-  const handleUploadCloudinary = async (e) => {
+  const handlePujarFitxer = async (e) => {
     const input = e.target;
     const file = input?.files?.[0];
-    if (!file || isUploading) return;
+    const tascaId = selectedMaterial?.id;
 
-    if (!selectedMaterial?.id) {
-      setUploadStatus('❌ Error: no s\'ha pogut identificar la tasca.');
-      resetUploadInput();
-      return;
-    }
+    if (!file || uploadingTascaId) return;
 
-    if (!APP_CONFIG?.cloudName || !APP_CONFIG?.uploadPreset) {
-      setUploadStatus('❌ Error: configuració de pujada no disponible.');
+    if (!tascaId) {
+      setUploadError('No s\'ha pogut identificar la tasca.');
       resetUploadInput();
       return;
     }
 
     if (file.size > 50 * 1024 * 1024) {
-      setUploadStatus('❌ El fitxer és massa gran. El límit són 50MB.');
+      setUploadError('El fitxer és massa gran. El límit són 50MB.');
       resetUploadInput();
       return;
     }
 
-    setIsUploading(true);
-    setUploadStatus('Preparant enviament...');
+    setUploadError('');
+    setUploadStatus('');
+    setUploadingTascaId(tascaId);
+    setUploadStatus('Pujant fitxer a Cloudinary...');
 
-    const tipusRecurs = obtenirTipusRecursCloudinary(file.name);
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('upload_preset', APP_CONFIG.uploadPreset);
-    formData.append('cloud_name', APP_CONFIG.cloudName);
+    formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
 
     try {
-      const res = await fetch(
-        `https://api.cloudinary.com/v1_1/${APP_CONFIG.cloudName}/${tipusRecurs}/upload`,
-        { method: 'POST', body: formData }
-      );
+      const res = await fetch(obtenirUrlPujadaCloudinary(file.name), {
+        method: 'POST',
+        body: formData
+      });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error?.message || "Error Cloudinary");
+
+      if (!res.ok) {
+        throw new Error(data.error?.message || 'Error en la resposta de Cloudinary.');
+      }
+
+      if (!data.secure_url) {
+        throw new Error('Cloudinary no ha retornat una URL vàlida (secure_url).');
+      }
 
       const urlCloudinary = normalitzarUrlCloudinary(data.secure_url, file.name);
-      if (!urlCloudinary) throw new Error('Cloudinary no ha retornat una URL vàlida.');
 
       setUploadStatus('Finalitzant entrega...');
 
       if (!auth.currentUser?.uid) {
-        setUploadStatus('❌ Error: sessió no vàlida. Inicia sessió de nou.');
-        resetUploadInput();
-        return;
+        throw new Error('Sessió no vàlida. Inicia sessió de nou.');
       }
 
       const dadesEntrega = {
-        alumneNom: studentData?.nom || user?.displayName || user?.email || "Alumne",
+        alumneNom: studentData?.nom || user?.displayName || user?.email || 'Alumne',
         alumneId: user.uid,
-        curs: studentData?.curs || "Curs no especificat",
-        alumneCurs: studentData?.curs || "Curs no especificat",
-        materialTitol: selectedMaterial.titol || "Sense títol",
-        materialId: selectedMaterial.id,
+        curs: studentData?.curs || 'Curs no especificat',
+        alumneCurs: studentData?.curs || 'Curs no especificat',
+        materialTitol: selectedMaterial.titol || 'Sense títol',
+        materialId: tascaId,
+        fileUrl: data.secure_url,
         urlCloudinary,
         fileName: file.name,
         estat: 'pendent_revisio',
@@ -437,17 +453,21 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
         dataLliurament: serverTimestamp()
       };
 
-      await addDoc(collection(db, "trameses"), dadesEntrega);
+      await addDoc(collection(db, 'trameses'), dadesEntrega);
       await enviarNotificacioEmail(file.name, selectedMaterial.titol);
-      
+
       setUploadStatus('✅ Tasca lliurada correctament!');
-      
     } catch (err) {
       console.error("Error en el procés d'entrega:", err);
-      const missatge = err?.message || "No s'ha pogut completar l'entrega. Torna-ho a provar.";
-      setUploadStatus(`❌ Error: ${missatge}`);
+      const missatge =
+        err?.message ||
+        (err?.name === 'TypeError'
+          ? 'Error de xarxa en connectar amb Cloudinary. Comprova la connexió.'
+          : "No s'ha pogut completar l'entrega. Torna-ho a provar.");
+      setUploadError(missatge);
+      setUploadStatus('');
     } finally {
-      setIsUploading(false);
+      setUploadingTascaId(null);
       resetUploadInput();
     }
   };
@@ -967,7 +987,7 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
                       ref={fileInputRef}
                       type="file"
                       hidden
-                      onChange={handleUploadCloudinary}
+                      onChange={handlePujarFitxer}
                       disabled={isUploading || tascaCompletada}
                     />
                   </label>
@@ -983,9 +1003,9 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
                     </div>
                   )}
 
-                  {uploadStatus.startsWith('❌') && !isUploading && (
+                  {uploadError && !isUploading && (
                     <div style={{ ...statusText(colors.danger), backgroundColor: '#fef2f2', padding: '15px', borderRadius: '15px', marginTop: '20px', border: `1px solid ${colors.danger}` }}>
-                      {uploadStatus}
+                      ❌ Error: {uploadError}
                     </div>
                   )}
                 </div>
