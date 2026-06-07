@@ -4,7 +4,7 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
   // Ruta base correcta per a GitHub Pages
-  base: '/Serra-d-equacions/', 
+  base: '/', 
 
   plugins: [
     react(),

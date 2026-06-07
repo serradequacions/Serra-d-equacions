@@ -437,7 +437,7 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
           subject: assumpte,
           contingut,
           content: contingut,
-          url: 'https://serradequacions.github.io/Serra-d-equacions/'
+          url: 'https://app-mates.web.app/'
         })
       });
 
@@ -551,7 +551,7 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
           tipus,
           titol,
           contingut,
-          url: 'https://serradequacions.github.io/Serra-d-equacions/'
+          url: 'https://app-mates.web.app/'
         })
       });
     } catch (e) {
@@ -675,7 +675,7 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
             '',
             `<em>Enviat des de: Panell d\'Administració</em>`
           ].join('<br>'),
-          url: 'https://serradequacions.github.io/Serra-d-equacions/'
+          url: 'https://app-mates.web.app/'
         })
       });
 
