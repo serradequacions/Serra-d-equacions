@@ -40,10 +40,10 @@ const ENLLACES_WHATSAPP_DASHBOARD = {
   "4t ESO A": "https://chat.whatsapp.com/BcoAOGM78nCJkabOitiRnY",
   "4t ESO B": "https://chat.whatsapp.com/DVZ7g6ekHMVDOmpDvKnEFH",
   "1r Batxillerat Científic": "https://chat.whatsapp.com/L6YXc7jcm6kFVDhIR1i0IQ",
-  "1r batxillerat CCSS": "https://chat.whatsapp.com/JguPEEqvFEM46GBcnLTA36",
-  "1r batxillerat General": "https://chat.whatsapp.com/BRP3t5UdeWmJG8TgiXZW1M",
+  "1r Batxillerat CCSS": "https://chat.whatsapp.com/JguPEEqvFEM46GBcnLTA36",
+  "1r Batxillerat General": "https://chat.whatsapp.com/BRP3t5UdeWmJG8TgiXZW1M",
   "2n Batxillerat Científic": "https://chat.whatsapp.com/IQzli2hPyNR6cyPsaGqYtH",
-  "2n batxillerat CCSS": "https://chat.whatsapp.com/CSyHjZsxz3gBzyqGyK0USI",
+  "2n Batxillerat CCSS": "https://chat.whatsapp.com/CSyHjZsxz3gBzyqGyK0USI",
 };
 /**
  * StudentDashboard.jsx - VERSIÓ INTEGRAL REPARADA (+500 línies)

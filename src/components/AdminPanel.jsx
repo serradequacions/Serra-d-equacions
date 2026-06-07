@@ -929,13 +929,14 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
         )}
 
         {isMobile && menuMobilObert && (
-          <div 
+          <div
+            onClick={() => setMenuMobilObert(false)}
             style={{
               position: 'fixed',
               inset: 0,
               backgroundColor: 'rgba(15, 23, 42, 0.5)',
               zIndex: 1000,
-              onClick: () => setMenuMobilObert(false)
+              cursor: 'pointer'
             }}
           />
         )}
