@@ -475,6 +475,32 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
   const teNota = teNotaValida(entregaActual);
   const tascaCompletada = esEntregaCompletada(entregaActual);
 
+  const DataLimitIndicador = ({ m, esTasca, entrega, colors }) => {
+    if (!esTasca(m) || !m.dataLimit || entrega) return null;
+    const avui = new Date();
+    avui.setHours(0, 0, 0, 0);
+    const limit = new Date(m.dataLimit);
+    limit.setHours(0, 0, 0, 0);
+    const diesRestants = Math.ceil((limit - avui) / (1000 * 60 * 60 * 24));
+    const vencuda = diesRestants < 0;
+    const urgent = diesRestants >= 0 && diesRestants <= 2;
+    const color = vencuda ? colors.danger : urgent ? colors.warning : colors.textLight;
+    const etiqueta = vencuda
+      ? '⛔ Data límit superada'
+      : diesRestants === 0
+        ? '⚠️ Avui és el darrer dia!'
+        : diesRestants === 1
+          ? '⚠️ Queda 1 dia'
+          : urgent
+            ? `⚠️ Queden ${diesRestants} dies`
+            : `📅 Entrega fins al ${limit.toLocaleDateString('ca-ES', { day: 'numeric', month: 'long' })}`;
+    return (
+      <div style={{ fontSize: '0.78rem', color, fontWeight: '700', marginTop: '5px' }}>
+        {etiqueta}
+      </div>
+    );
+  };
+
   const renderFilaMaterial = (m, colors, APP_CONFIG) => {
     const entrega = obtenirEntregaPerMaterial(m.id);
     const completada = esTasca(m) && esEntregaCompletada(entrega);
@@ -511,6 +537,7 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
                 <span style={{ marginLeft: '10px', color: colors.warning }}>· Pendent</span>
               )}
             </div>
+            <DataLimitIndicador m={m} esTasca={esTasca} entrega={entrega} colors={colors} />
             {completada && teNotaValida(entrega) && (
               <div style={{ fontSize: '0.8rem', color: colors.primaryDark, fontWeight: '800', marginTop: '6px' }}>
                 Nota: {entrega.nota}/10

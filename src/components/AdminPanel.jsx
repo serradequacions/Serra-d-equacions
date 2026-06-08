@@ -256,6 +256,7 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
   const [recursTipus, setRecursTipus] = useState('Teoria');
   const [recursTema, setRecursTema] = useState('');
   const [temaLliure, setTemaLliure] = useState('');
+  const [recursDataLimit, setRecursDataLimit] = useState('');
 
   const [activeTab, setActiveTab] = useState('avisos');
   const [expandedCurs, setExpandedCurs] = useState(null);
@@ -269,6 +270,8 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
   const [comentarisProfessor, setComentarisProfessor] = useState({});
   const [loadingSeguretat, setLoadingSeguretat] = useState(true);
   const [errorSeguretat, setErrorSeguretat] = useState(null);
+  // Modal de confirmació d'esborrat
+  const [confirmEsborrar, setConfirmEsborrar] = useState(null); // { col, id, titol }
 
   const colors = {
     primary: '#2563eb',
@@ -595,7 +598,8 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
         cursos: recursCursos,
         tipus: recursTipus,
         tema: temaFinal,
-        data: serverTimestamp()
+        data: serverTimestamp(),
+        dataLimit: recursDataLimit || null
       });
       await handleNotificar('material', recursTitol, `Nou material: ${recursTitol}`, recursCursos);
       setRecursTitol('');
@@ -604,6 +608,7 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
       setRecursTema('');
       setTemaLliure('');
       setRecursCursos([]);
+      setRecursDataLimit('');
       alert('Material publicat.');
     } catch (e) {
       alert(e.message);
@@ -612,13 +617,18 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
     }
   };
 
-  const handleEsborrar = async (col, id) => {
-    if (window.confirm('Eliminar?')) {
-      try {
-        await deleteDoc(doc(db, col, id));
-      } catch (e) {
-        alert(e.message);
-      }
+  const handleEsborrar = (col, id, titol = '') => {
+    setConfirmEsborrar({ col, id, titol });
+  };
+
+  const confirmarEsborrat = async () => {
+    if (!confirmEsborrar) return;
+    try {
+      await deleteDoc(doc(db, confirmEsborrar.col, confirmEsborrar.id));
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setConfirmEsborrar(null);
     }
   };
 
@@ -867,6 +877,20 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
             <input placeholder="Títol" value={recursTitol} onChange={(e) => setRecursTitol(e.target.value)} style={inputStyle(colors)} />
             <input placeholder="URL" value={recursUrl} onChange={(e) => setRecursUrl(e.target.value)} style={inputStyle(colors)} />
             <textarea placeholder="Descripció..." value={recursDescripcio} onChange={(e) => setRecursDescripcio(e.target.value)} style={{ ...textareaStyle(colors), height: '60px' }} />
+            {recursTipus?.toLowerCase().includes('tasca') && (
+              <div style={{ marginBottom: '12px' }}>
+                <label style={{ fontSize: '0.75rem', fontWeight: '700', color: colors.textLight, display: 'block', marginBottom: '6px' }}>
+                  📅 Data límit d'entrega (opcional)
+                </label>
+                <input
+                  type="date"
+                  value={recursDataLimit}
+                  onChange={(e) => setRecursDataLimit(e.target.value)}
+                  min={new Date().toISOString().split('T')[0]}
+                  style={{ ...inputStyle(colors), color: recursDataLimit ? colors.textDark : colors.textLight }}
+                />
+              </div>
+            )}
 
             <div style={{ marginBottom: '12px' }}>
               <div style={{ fontSize: '0.75rem', color: colors.textLight, marginBottom: '8px', fontWeight: '600' }}>Tipus</div>
@@ -1004,7 +1028,7 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
                             />
                           </td>
                           <td style={{ padding: '15px' }}>
-                            <button type="button" onClick={() => handleEsborrar('trameses', tramesa.id)} style={deleteBtn}>✕</button>
+                            <button type="button" onClick={() => handleEsborrar('trameses', tramesa.id, `entrega de ${tramesa.alumneNom || 'alumne'}`)} style={deleteBtn}>✕</button>
                           </td>
                         </tr>
                       );
@@ -1027,7 +1051,7 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
                       ))}
                     </div>
                   </div>
-                  <button type="button" onClick={() => handleEsborrar('avisos', a.id)} style={deleteBtn}>✕</button>
+                  <button type="button" onClick={() => handleEsborrar('avisos', a.id, a.contingut?.substring(0, 40))} style={deleteBtn}>✕</button>
                 </div>
               ))}
             </div>
@@ -1054,6 +1078,11 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
                               <div style={{ minWidth: 0 }}>
                                 <div style={{ fontWeight: '600', fontSize: '0.9rem' }}>{m.titol}</div>
                                 <div style={{ fontSize: '0.7rem', color: colors.textLight }}>{m.tema} · {m.tipus}</div>
+                                {esTasca(m) && m.dataLimit && (
+                                  <div style={{ fontSize: '0.7rem', color: colors.warning, fontWeight: '700', marginTop: '2px' }}>
+                                    📅 Límit: {new Date(m.dataLimit).toLocaleDateString('ca-ES', { day: 'numeric', month: 'long', year: 'numeric' })}
+                                  </div>
+                                )}
                               </div>
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
@@ -1062,7 +1091,7 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
                                   Revisar {numEntregues > 0 ? `(${numEntregues})` : ''}
                                 </button>
                               )}
-                              <button type="button" onClick={() => handleEsborrar('materials', m.id)} style={deleteTextBtn}>Eliminar</button>
+                              <button type="button" onClick={() => handleEsborrar('materials', m.id, m.titol)} style={deleteTextBtn}>Eliminar</button>
                             </div>
                           </div>
                         );
@@ -1222,6 +1251,46 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
           </p>
         </div>
       </footer>
+
+      {/* MODAL DE CONFIRMACIÓ D'ESBORRAT */}
+      {confirmEsborrar && (
+        <div style={modalOverlayStyle} onClick={() => setConfirmEsborrar(null)}>
+          <div
+            style={{ backgroundColor: '#fff', borderRadius: '20px', padding: '32px', maxWidth: '420px', width: '100%', boxShadow: '0 25px 50px rgba(0,0,0,0.2)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ fontSize: '2.5rem', textAlign: 'center', marginBottom: '16px' }}>🗑️</div>
+            <h3 style={{ margin: '0 0 12px 0', textAlign: 'center', fontSize: '1.2rem', fontWeight: '800', color: '#0f172a' }}>
+              Confirmar eliminació
+            </h3>
+            <p style={{ margin: '0 0 8px 0', textAlign: 'center', color: '#64748b', fontSize: '0.95rem', lineHeight: '1.5' }}>
+              Estàs a punt d'eliminar:
+            </p>
+            {confirmEsborrar.titol && (
+              <p style={{ margin: '0 0 24px 0', textAlign: 'center', fontWeight: '700', color: '#0f172a', fontSize: '0.95rem', backgroundColor: '#f1f5f9', padding: '10px 16px', borderRadius: '10px' }}>
+                "{confirmEsborrar.titol}"
+              </p>
+            )}
+            <p style={{ margin: '0 0 24px 0', textAlign: 'center', color: '#ef4444', fontSize: '0.85rem', fontWeight: '600' }}>
+              Aquesta acció no es pot desfer.
+            </p>
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button
+                onClick={() => setConfirmEsborrar(null)}
+                style={{ flex: 1, padding: '12px', border: '1px solid #e2e8f0', borderRadius: '10px', background: '#f8fafc', fontWeight: '700', cursor: 'pointer', fontSize: '0.9rem' }}
+              >
+                Cancel·lar
+              </button>
+              <button
+                onClick={confirmarEsborrat}
+                style={{ flex: 1, padding: '12px', border: 'none', borderRadius: '10px', background: '#ef4444', color: 'white', fontWeight: '700', cursor: 'pointer', fontSize: '0.9rem' }}
+              >
+                Sí, eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
