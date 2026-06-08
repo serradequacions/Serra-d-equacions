@@ -19,6 +19,7 @@ import {
 } from 'firebase/firestore';
 import MissatgesPrivats from './MissatgesPrivats';
 import { normalitzarUrlCloudinary, obtenirTipusRecursCloudinary } from '../utils/cloudinary';
+import { LLISTA_CURSOS } from '../constants';
 
 const obtenirUrlCloudinaryTramesa = (tramesa) =>
   normalitzarUrlCloudinary(tramesa?.urlCloudinary || tramesa?.fileUrl || '', tramesa?.fileName);
@@ -238,11 +239,6 @@ function TaulaRevisioTrameses({ entregues, colors, onGuardarNota, onGuardarComen
 }
 
 export default function AdminPanel({ APP_CONFIG, logoImg }) {
-  const LLISTA_CURSOS = [
-    '1r ESO', '2n ESO', '3r ESO', '4t ESO A', '4t ESO B',
-    '1r Batxillerat Científic', '1r Batxillerat CCSS', '1r Batxillerat General',
-    '2n Batxillerat Científic', '2n Batxillerat CCSS'
-  ];
 
   const WORKER_URL = 'https://brevo-proxy.serradequacions.workers.dev';
 

@@ -16,7 +16,7 @@ export default defineConfig({
       manifest: {
         name: "Serra d'Equacions",
         short_name: "Serra d'Equacions",
-        description: "App de gestió educativa",
+        description: "Plataforma de matemàtiques per a ESO i Batxillerat",
         theme_color: '#8fb382',
         background_color: '#ffffff',
         display: 'standalone',

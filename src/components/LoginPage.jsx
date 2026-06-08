@@ -7,6 +7,7 @@ import {
   onAuthStateChanged
 } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { LLISTA_CURSOS } from '../constants';
 
 /**
  * LoginPage.jsx
@@ -28,13 +29,6 @@ export default function LoginPage({ APP_CONFIG, logoImg }) {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [nom, setNom] = useState('');
   const [curs, setCurs] = useState('');
-
-  // --- LLISTA DE CURSOS (Sincronitzada amb AdminPanel.jsx) ---
-  const LLISTA_CURSOS = [
-    "1r ESO", "2n ESO", "3r ESO", "4t ESO A", "4t ESO B",
-    "1r Batxillerat Científic", "1r Batxillerat CCSS", "1r Batxillerat General",
-    "2n Batxillerat Científic", "2n Batxillerat CCSS"
-  ];
 
   // --- LÒGICA D'AUTENTICACIÓ ---
 
@@ -317,7 +311,7 @@ export default function LoginPage({ APP_CONFIG, logoImg }) {
             {mode === 'login' ? 'Benvingut/da' : mode === 'register' ? 'Crea un compte' : 'Recuperar accés'}
           </h1>
           <p style={subtitleStyle}>
-            {mode === 'login' && "Accedeix al Campus Serra per gestionar el teu curs."}
+            {mode === 'login' && "Accedeix a Serra d'Equacions per veure els teus materials."}
             {mode === 'register' && "Registra't per accedir als materials de la teva classe."}
             {mode === 'reset' && "T'enviarem un correu electrònic per restablir el teu compte."}
           </p>
@@ -468,7 +462,7 @@ export default function LoginPage({ APP_CONFIG, logoImg }) {
 
         {/* FOOTER */}
         <div style={{ marginTop: '40px', textAlign: 'center', fontSize: '0.8rem', color: colors.textLight }}>
-          &copy; {new Date().getFullYear()} Campus Serra - Gestió Educativa Premium
+          &copy; {new Date().getFullYear()} Serra d'Equacions
           <br />
           Suport: <a href={`mailto:${APP_CONFIG?.adminEmail}`} style={{ color: colors.primary, textDecoration: 'none', fontWeight: '600' }}>{APP_CONFIG?.adminEmail}</a>
         </div>
