@@ -5,6 +5,7 @@ import {
 } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import MissatgesPrivats from './MissatgesPrivats';
+import AIAssistant from './AIAssistant';
 import { normalitzarUrlCloudinary, obtenirTipusRecursCloudinary } from '../utils/cloudinary';
 
 const CLOUDINARY_URL = 'https://api.cloudinary.com/v1_1/ducevp5vb/image/upload';
@@ -822,6 +823,21 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
                 </div>
               )}
             </div>
+
+            <AIAssistant
+              variant="embedded"
+              studentData={studentData}
+              materials={materials}
+              entregasAlumne={entregasAlumne}
+              avisos={avisos}
+              colors={colors}
+              isMobile={isMobile}
+              onNavigate={(novaVista) => {
+                setView(novaVista);
+                setMenuMobilObert(false);
+              }}
+              aiEndpoint={APP_CONFIG?.studentAIAssistantEndpoint}
+            />
             
             <h3 style={sectionLabel}>Últimes Notícies</h3>
             {avisos.length === 0 ? (
@@ -1208,6 +1224,21 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
           </p>
         </div>
       </footer>
+
+      <AIAssistant
+        variant="floating"
+        studentData={studentData}
+        materials={materials}
+        entregasAlumne={entregasAlumne}
+        avisos={avisos}
+        colors={colors}
+        isMobile={isMobile}
+        onNavigate={(novaVista) => {
+          setView(novaVista);
+          setMenuMobilObert(false);
+        }}
+        aiEndpoint={APP_CONFIG?.studentAIAssistantEndpoint}
+      />
 
       <style>{`
         .fade-in { animation: fadeIn 0.6s cubic-bezier(0.23, 1, 0.32, 1); }
