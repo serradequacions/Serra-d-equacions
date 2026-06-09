@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { db, auth } from '../firebase';
 import { 
-  collection, query, where, onSnapshot, orderBy, doc, getDoc, addDoc, serverTimestamp 
+  collection, query, where, onSnapshot, orderBy, doc, getDoc, addDoc, serverTimestamp, updateDoc
 } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import MissatgesPrivats from './MissatgesPrivats';
@@ -67,10 +67,7 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
   const [contactForm, setContactForm] = useState({ nom: '', correu: '', missatge: '' });
   const [enviatAmbExit, setEnviatAmbExit] = useState(false);
   const [carregantContacte, setCarregantContacte] = useState(false);
-  const [avisosLlegits, setAvisosLlegits] = useState(() => {
-    const guardats = localStorage.getItem('avisosLlegits');
-    return guardats ? JSON.parse(guardats) : [];
-  });
+  const [avisosLlegits, setAvisosLlegits] = useState([]);
   const [loadingSeguretat, setLoadingSeguretat] = useState(true);
   const [errorSeguretat, setErrorSeguretat] = useState(null);
   
@@ -182,6 +179,8 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
         if (docSnap.exists()) {
           const data = docSnap.data();
           setStudentData(data);
+          // Carregar avisosLlegits des de Firestore (sincronitzat entre dispositius)
+          setAvisosLlegits(data.avisosLlegits || []);
           subscribeToContent(data.curs);
         } else {
           const fallbackData = { 
@@ -340,10 +339,18 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
     setContactForm({ nom: '', correu: '', missatge: '' });
   };
 
-  const handleMarcarComLlegit = (avisoId) => {
+  const handleMarcarComLlegit = async (avisoId) => {
     const nousLlegits = [...avisosLlegits, avisoId];
-    setAvisosLlegits(nousLlegits);
-    localStorage.setItem('avisosLlegits', JSON.stringify(nousLlegits));
+    setAvisosLlegits(nousLlegits); // actualització optimista
+    try {
+      await updateDoc(doc(db, 'usuaris', user.uid), {
+        avisosLlegits: nousLlegits
+      });
+    } catch (error) {
+      console.error("Error guardant avís llegit:", error);
+      // Revertir si falla
+      setAvisosLlegits(avisosLlegits);
+    }
   };
 
   const esMaterialSolucionari = (material) => {

@@ -9,7 +9,10 @@ export default function MissatgesPrivats({ user, isAdmin = false, colors }) {
   const [selectedAlumne, setSelectedAlumne] = useState(null);
   const [titol, setTitol] = useState('');
   const [missatge, setMissatge] = useState('');
-  const [resposta, setResposta] = useState('');
+  // Map: consultaId -> text de la resposta en curs (evita barrejar respostes entre consultes)
+  const [respostes, setRespostes] = useState({});
+  // Set: consultaId -> mode edició actiu
+  const [editant, setEditant] = useState({});
   const [isSending, setIsSending] = useState(false);
 
   // Color scheme fallback
@@ -91,23 +94,43 @@ export default function MissatgesPrivats({ user, isAdmin = false, colors }) {
     }
   };
 
-  // Enviar resposta (professor)
+  // Helpers per gestionar el Map de respostes per consulta
+  const setRespostaConsulta = (consultaId, text) =>
+    setRespostes((prev) => ({ ...prev, [consultaId]: text }));
+
+  const getRespostaConsulta = (consultaId) => respostes[consultaId] ?? '';
+
+  // Enviar o actualitzar resposta (professor)
   const handleEnviarResposta = async (consultaId) => {
-    if (!resposta.trim()) return;
+    const text = getRespostaConsulta(consultaId).trim();
+    if (!text) return;
 
     setIsSending(true);
     try {
       await updateDoc(doc(db, 'consultes_privades', consultaId), {
-        respostaProfessor: resposta.trim(),
+        respostaProfessor: text,
         dataResposta: serverTimestamp()
       });
-      setResposta('');
+      // Netejar l'estat d'aquest consulta i tancar edició
+      setRespostes((prev) => { const n = { ...prev }; delete n[consultaId]; return n; });
+      setEditant((prev) => { const n = { ...prev }; delete n[consultaId]; return n; });
     } catch (error) {
       console.error('Error enviant resposta:', error);
       alert('Error enviant la resposta. Torna-ho a provar.');
     } finally {
       setIsSending(false);
     }
+  };
+
+  // Activar edició d'una resposta ja enviada
+  const activarEdicio = (consultaId, respostaActual) => {
+    setRespostaConsulta(consultaId, respostaActual);
+    setEditant((prev) => ({ ...prev, [consultaId]: true }));
+  };
+
+  const cancellarEdicio = (consultaId) => {
+    setRespostes((prev) => { const n = { ...prev }; delete n[consultaId]; return n; });
+    setEditant((prev) => { const n = { ...prev }; delete n[consultaId]; return n; });
   };
 
   // Format data
@@ -316,26 +339,62 @@ export default function MissatgesPrivats({ user, isAdmin = false, colors }) {
                       <div style={{ fontSize: '0.75rem', color: safeColors.primary, fontWeight: '700', marginBottom: '6px' }}>
                         LA TEVA RESPOSTA:
                       </div>
-                      <div style={{ fontSize: '0.95rem', color: safeColors.textDark, lineHeight: '1.6' }}>
-                        {cons.respostaProfessor}
-                      </div>
-                      <div style={{ fontSize: '0.75rem', color: safeColors.textLight, marginTop: '8px' }}>
-                        {formatData(cons.dataResposta)}
-                      </div>
+                      {editant[cons.id] ? (
+                        <>
+                          <textarea
+                            value={getRespostaConsulta(cons.id)}
+                            onChange={(e) => setRespostaConsulta(cons.id, e.target.value)}
+                            style={textareaStyle(safeColors)}
+                            disabled={isSending}
+                          />
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <button
+                              onClick={() => handleEnviarResposta(cons.id)}
+                              style={{ ...primaryButtonStyle(safeColors), flex: 1 }}
+                              disabled={isSending || !getRespostaConsulta(cons.id).trim()}
+                            >
+                              {isSending ? 'Guardant...' : 'Guardar canvis'}
+                            </button>
+                            <button
+                              onClick={() => cancellarEdicio(cons.id)}
+                              style={{ padding: '14px', border: `1px solid ${safeColors.border}`, borderRadius: '10px', background: '#f8fafc', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                            >
+                              Cancel·lar
+                            </button>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div style={{ fontSize: '0.95rem', color: safeColors.textDark, lineHeight: '1.6' }}>
+                            {cons.respostaProfessor}
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }}>
+                            <div style={{ fontSize: '0.75rem', color: safeColors.textLight }}>
+                              {formatData(cons.dataResposta)}
+                            </div>
+                            <button
+                              onClick={() => activarEdicio(cons.id, cons.respostaProfessor)}
+                              style={{ fontSize: '0.75rem', color: safeColors.primary, background: 'none', border: 'none', cursor: 'pointer', fontWeight: '700' }}
+                            >
+                              ✏️ Editar
+                            </button>
+                          </div>
+                        </>
+                      )}
                     </div>
                   ) : (
                     <div>
                       <textarea
                         placeholder="Escriu la teva resposta..."
-                        value={resposta}
-                        onChange={(e) => setResposta(e.target.value)}
+                        value={getRespostaConsulta(cons.id)}
+                        onChange={(e) => setRespostaConsulta(cons.id, e.target.value)}
                         style={textareaStyle(safeColors)}
                         disabled={isSending}
                       />
-                      <button 
+                      <button
                         onClick={() => handleEnviarResposta(cons.id)}
                         style={primaryButtonStyle(safeColors)}
-                        disabled={isSending || !resposta.trim()}
+                        disabled={isSending || !getRespostaConsulta(cons.id).trim()}
                       >
                         {isSending ? 'Enviant...' : 'Enviar resposta'}
                       </button>

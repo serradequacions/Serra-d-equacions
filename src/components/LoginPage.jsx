@@ -11,7 +11,7 @@ import { LLISTA_CURSOS } from '../constants';
 
 /**
  * LoginPage.jsx
- * Component d'autenticació premium per al Campus Serra.
+ * Component d'autenticació de Serra d'Equacions.
  * Inclou: Login, Registre (amb selecció de curs) i Recuperació de contrasenya.
  */
 
