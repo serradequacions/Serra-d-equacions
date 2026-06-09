@@ -824,20 +824,6 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
               )}
             </div>
 
-            <AIAssistant
-              variant="embedded"
-              studentData={studentData}
-              materials={materials}
-              entregasAlumne={entregasAlumne}
-              avisos={avisos}
-              colors={colors}
-              isMobile={isMobile}
-              onNavigate={(novaVista) => {
-                setView(novaVista);
-                setMenuMobilObert(false);
-              }}
-              aiEndpoint={APP_CONFIG?.studentAIAssistantEndpoint}
-            />
             
             <h3 style={sectionLabel}>Últimes Notícies</h3>
             {avisos.length === 0 ? (
