@@ -1,0 +1,29 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "trameses",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "alumneId", "order": "ASCENDING" },
+        { "fieldPath": "data", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "avisos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "cursos", "arrayConfig": "CONTAINS" },
+        { "fieldPath": "data", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "materials",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "cursos", "arrayConfig": "CONTAINS" },
+        { "fieldPath": "data", "order": "DESCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

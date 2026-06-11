@@ -1,0 +1,190 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function userPath(uid) {
+      return /databases/$(database)/documents/usuaris/$(uid);
+    }
+
+    function userData(uid) {
+      return get(userPath(uid)).data;
+    }
+
+    function myUserData() {
+      return userData(request.auth.uid);
+    }
+
+    function isOwner(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    function isStaff() {
+      return signedIn()
+        && exists(userPath(request.auth.uid))
+        && myUserData().rol in ['admin', 'professor', 'administrador'];
+    }
+
+    function isStudent() {
+      return signedIn()
+        && exists(userPath(request.auth.uid))
+        && myUserData().rol == 'alumne';
+    }
+
+    function validString(value, max) {
+      return value is string && value.size() > 0 && value.size() <= max;
+    }
+
+    function validOptionalString(value, max) {
+      return value == null || (value is string && value.size() <= max);
+    }
+
+    function validCourseArray(cursos) {
+      return cursos is list && cursos.size() > 0 && cursos.size() <= 20;
+    }
+
+    function hasOnlyAllowedUserFields() {
+      return request.resource.data.keys().hasOnly([
+        'uid', 'nom', 'email', 'curs', 'rol', 'createdAt', 'avisosLlegits'
+      ]);
+    }
+
+    match /usuaris/{userId} {
+      // L'alumne només pot llegir el seu perfil. Professorat/admin pot llegir tots els perfils.
+      allow read: if isOwner(userId) || isStaff();
+
+      // Registre inicial: un usuari només pot crear el seu document com a alumne.
+      allow create: if isOwner(userId)
+        && hasOnlyAllowedUserFields()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.rol == 'alumne'
+        && validString(request.resource.data.nom, 120)
+        && validString(request.resource.data.curs, 80);
+
+      // L'alumne només pot actualitzar avisosLlegits i dades bàsiques, mai el rol.
+      allow update: if isOwner(userId)
+        && hasOnlyAllowedUserFields()
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.email == resource.data.email
+        && request.resource.data.rol == resource.data.rol
+        && request.resource.data.diff(resource.data).changedKeys().hasOnly(['nom', 'curs', 'avisosLlegits']);
+
+      // Professorat/admin pot gestionar perfils, inclòs canvi de curs o rol.
+      allow update, delete: if isStaff();
+    }
+
+    match /avisos/{avisId} {
+      allow read: if signedIn();
+      allow create, update: if isStaff()
+        && request.resource.data.keys().hasOnly(['contingut', 'cursos', 'data'])
+        && validString(request.resource.data.contingut, 3000)
+        && validCourseArray(request.resource.data.cursos);
+      allow delete: if isStaff();
+    }
+
+    match /materials/{materialId} {
+      allow read: if signedIn();
+      allow create, update: if isStaff()
+        && request.resource.data.keys().hasOnly([
+          'titol', 'url', 'descripcio', 'cursos', 'tipus', 'tema', 'data', 'dataLimit'
+        ])
+        && validString(request.resource.data.titol, 200)
+        && validOptionalString(request.resource.data.url, 2000)
+        && validOptionalString(request.resource.data.descripcio, 5000)
+        && validCourseArray(request.resource.data.cursos)
+        && validString(request.resource.data.tipus, 40)
+        && validString(request.resource.data.tema, 120);
+      allow delete: if isStaff();
+    }
+
+    match /config_temes/{cursId} {
+      allow read: if signedIn();
+      allow create, update, delete: if isStaff();
+    }
+
+    match /trameses/{tramesaId} {
+      // L'alumne només veu les seves entregues; professorat/admin veu totes.
+      allow read: if isStaff() || (signedIn() && resource.data.alumneId == request.auth.uid);
+
+      // L'alumne només pot crear entregues pròpies i sempre en estat pendent.
+      allow create: if isStudent()
+        && request.resource.data.keys().hasOnly([
+          'alumneNom', 'alumneId', 'curs', 'alumneCurs', 'materialTitol', 'materialId',
+          'fileUrl', 'urlCloudinary', 'fileName', 'estat', 'data', 'dataLliurament'
+        ])
+        && request.resource.data.alumneId == request.auth.uid
+        && request.resource.data.estat == 'pendent_revisio'
+        && validString(request.resource.data.alumneNom, 120)
+        && validString(request.resource.data.curs, 80)
+        && validString(request.resource.data.alumneCurs, 80)
+        && validString(request.resource.data.materialTitol, 200)
+        && validString(request.resource.data.materialId, 120)
+        && validString(request.resource.data.fileUrl, 2000)
+        && validString(request.resource.data.urlCloudinary, 2000)
+        && validString(request.resource.data.fileName, 255);
+
+      // Només professorat/admin pot posar nota, comentari o canviar l'estat.
+      allow update: if isStaff()
+        && request.resource.data.diff(resource.data).changedKeys().hasOnly([
+          'nota', 'estat', 'comentariProfessor', 'dataResposta', 'dataCorreccio'
+        ])
+        && request.resource.data.estat in ['pendent_revisio', 'completada']
+        && (!('nota' in request.resource.data) || request.resource.data.nota == null ||
+            (request.resource.data.nota is number && request.resource.data.nota >= 0 && request.resource.data.nota <= 10))
+        && (!('comentariProfessor' in request.resource.data) || validOptionalString(request.resource.data.comentariProfessor, 5000));
+
+      allow delete: if isStaff();
+    }
+
+    match /consultes_privades/{consultaId} {
+      // Professorat/admin veu totes; alumne només les seves per email.
+      allow read: if isStaff()
+        || (signedIn() && resource.data.alumneEmail == request.auth.token.email);
+
+      // L'alumne crea consultes pròpies sense poder escriure resposta del professor.
+      allow create: if isStudent()
+        && request.resource.data.keys().hasOnly([
+          'alumneEmail', 'alumneNom', 'titol', 'missatge',
+          'respostaProfessor', 'dataCreacio', 'dataResposta'
+        ])
+        && request.resource.data.alumneEmail == request.auth.token.email
+        && validString(request.resource.data.alumneNom, 120)
+        && validString(request.resource.data.titol, 200)
+        && validString(request.resource.data.missatge, 5000)
+        && request.resource.data.respostaProfessor == ''
+        && request.resource.data.dataResposta == null;
+
+      // Només professorat/admin pot respondre o editar la resposta.
+      allow update: if isStaff()
+        && request.resource.data.diff(resource.data).changedKeys().hasOnly([
+          'respostaProfessor', 'dataResposta'
+        ])
+        && validString(request.resource.data.respostaProfessor, 5000);
+
+      allow delete: if isStaff();
+    }
+
+    match /contactes_footer/{contacteId} {
+      // Formulari de contacte. Es permet crear si l'usuari està identificat.
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly([
+          'nom', 'email', 'missatge', 'enviatDesDe', 'dataEnviament'
+        ])
+        && validString(request.resource.data.nom, 120)
+        && validString(request.resource.data.email, 200)
+        && validString(request.resource.data.missatge, 5000)
+        && request.resource.data.enviatDesDe in ['Admin', 'StudentDashboard', 'Alumne', 'Professor'];
+      allow read, update, delete: if isStaff();
+    }
+
+    // Tanca qualsevol altra col·lecció que no estigui contemplada.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

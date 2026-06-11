@@ -11,6 +11,35 @@ import { normalitzarUrlCloudinary, obtenirTipusRecursCloudinary } from '../utils
 const CLOUDINARY_URL = 'https://api.cloudinary.com/v1_1/ducevp5vb/image/upload';
 const CLOUDINARY_UPLOAD_PRESET = 'tasques_alumnes'; // Preset Cloudinary configurat com a 'unsigned'
 
+const MAX_UPLOAD_SIZE_MB = 50;
+const MAX_UPLOAD_SIZE_BYTES = MAX_UPLOAD_SIZE_MB * 1024 * 1024;
+const EXTENSIONS_PERMESES = ['pdf', 'jpg', 'jpeg', 'png', 'docx'];
+const ACCEPT_UPLOAD_TYPES = '.pdf,.jpg,.jpeg,.png,.docx,application/pdf,image/jpeg,image/png,application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
+const obtenirExtensioLocal = (fileName = '') => {
+  const nomNet = fileName.split('?')[0].split('#')[0];
+  return nomNet.includes('.') ? nomNet.split('.').pop()?.toLowerCase() || '' : '';
+};
+
+const validarFitxerEntrega = (file) => {
+  if (!file) return 'No has seleccionat cap fitxer.';
+
+  const extensio = obtenirExtensioLocal(file.name);
+  if (!EXTENSIONS_PERMESES.includes(extensio)) {
+    return 'Format no permès. Puja un PDF, JPG, PNG o DOCX.';
+  }
+
+  if (file.size > MAX_UPLOAD_SIZE_BYTES) {
+    return `El fitxer és massa gran. El límit són ${MAX_UPLOAD_SIZE_MB}MB.`;
+  }
+
+  if (file.size === 0) {
+    return 'El fitxer està buit. Tria un altre fitxer.';
+  }
+
+  return '';
+};
+
 const obtenirUrlPujadaCloudinary = (fileName) => {
   const tipus = obtenirTipusRecursCloudinary(fileName);
   if (tipus === 'raw') {
@@ -45,6 +74,98 @@ const ENLLACES_WHATSAPP_DASHBOARD = {
   "1r Batxillerat General": "https://chat.whatsapp.com/BRP3t5UdeWmJG8TgiXZW1M",
   "2n Batxillerat Científic": "https://chat.whatsapp.com/IQzli2hPyNR6cyPsaGqYtH",
   "2n Batxillerat CCSS": "https://chat.whatsapp.com/CSyHjZsxz3gBzyqGyK0USI",
+};
+
+const EXERCICIS_AUTOCORREGIBLES = [
+  {
+    id: 'eq1_transposicio_001',
+    tema: 'Equacions',
+    nivell: 'ESO',
+    enunciat: 'Resol l’equació: 2x + 5 = 17',
+    resposta: '6',
+    alternatives: ['x=6', 'x = 6'],
+    pista1: 'Primer resta 5 als dos membres de l’equació.',
+    pista2: 'Queda 2x = 12. Ara divideix entre 2.',
+    explicacio: '2x + 5 = 17 → 2x = 12 → x = 6.',
+    tipusErrorSiFalla: 'transposicio_equacions'
+  },
+  {
+    id: 'pct_001',
+    tema: 'Percentatges',
+    nivell: 'ESO',
+    enunciat: 'Calcula el 15% de 80.',
+    resposta: '12',
+    alternatives: ['12,0', '12.0'],
+    pista1: '15% vol dir 15 de cada 100.',
+    pista2: 'Calcula 80 · 15 / 100.',
+    explicacio: '80 · 0,15 = 12.',
+    tipusErrorSiFalla: 'percentatge_basic'
+  },
+  {
+    id: 'funcions_pendent_001',
+    tema: 'Funcions',
+    nivell: 'ESO/Batxillerat',
+    enunciat: 'Quina és la pendent de la recta y = 3x - 2?',
+    resposta: '3',
+    alternatives: ['m=3', 'm = 3'],
+    pista1: 'En una recta y = mx + n, la pendent és el nombre que multiplica la x.',
+    pista2: 'Compara y = 3x - 2 amb y = mx + n.',
+    explicacio: 'La pendent és m = 3.',
+    tipusErrorSiFalla: 'identificacio_pendent'
+  },
+  {
+    id: 'sistemes_001',
+    tema: 'Sistemes',
+    nivell: 'ESO',
+    enunciat: 'Si x + y = 10 i x = 4, quin valor té y?',
+    resposta: '6',
+    alternatives: ['y=6', 'y = 6'],
+    pista1: 'Substitueix x per 4 dins x + y = 10.',
+    pista2: 'Queda 4 + y = 10.',
+    explicacio: '4 + y = 10 → y = 6.',
+    tipusErrorSiFalla: 'substitucio_sistemes'
+  },
+  {
+    id: 'derivades_001',
+    tema: 'Derivades',
+    nivell: 'Batxillerat',
+    enunciat: 'Deriva la funció f(x) = x².',
+    resposta: '2x',
+    alternatives: ['f’(x)=2x', "f'(x)=2x", 'f’(x) = 2x', "f'(x) = 2x"],
+    pista1: 'Recorda la regla: la derivada de xⁿ és n·xⁿ⁻¹.',
+    pista2: 'Aquí n = 2.',
+    explicacio: 'La derivada de x² és 2x.',
+    tipusErrorSiFalla: 'regla_potencia_derivades'
+  },
+  {
+    id: 'probabilitat_001',
+    tema: 'Probabilitat',
+    nivell: 'ESO/Batxillerat',
+    enunciat: 'En una bossa hi ha 3 bolles vermelles i 2 blaves. Quina és la probabilitat de treure una bolla blava? Dona la resposta en fracció.',
+    resposta: '2/5',
+    alternatives: ['2 de 5', '0,4', '0.4', '40%'],
+    pista1: 'La probabilitat és casos favorables dividit entre casos possibles.',
+    pista2: 'Hi ha 2 bolles blaves i 5 bolles en total.',
+    explicacio: 'P(blava) = 2/5, que també és 0,4 o 40%.',
+    tipusErrorSiFalla: 'probabilitat_laplace'
+  }
+];
+
+const normalitzarRespostaExercici = (valor = '') =>
+  String(valor)
+    .toLowerCase()
+    .trim()
+    .replaceAll(' ', '')
+    .replaceAll(',', '.')
+    .replaceAll('·', '*')
+    .replaceAll('−', '-')
+    .replaceAll('²', '^2')
+    .replaceAll('’', "'");
+
+const respostaEsCorrecta = (respostaAlumne, exercici) => {
+  const resposta = normalitzarRespostaExercici(respostaAlumne);
+  const correctes = [exercici.resposta, ...(exercici.alternatives || [])].map(normalitzarRespostaExercici);
+  return correctes.includes(resposta);
 };
 /**
  * StudentDashboard.jsx - VERSIÓ INTEGRAL REPARADA (+500 línies)
@@ -401,22 +522,52 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
 
     if (!file || uploadingTascaId) return;
 
-    if (!tascaId) {
-      setUploadError('No s\'ha pogut identificar la tasca.');
-      resetUploadInput();
-      return;
-    }
-
-    if (file.size > 50 * 1024 * 1024) {
-      setUploadError('El fitxer és massa gran. El límit són 50MB.');
-      resetUploadInput();
-      return;
-    }
-
     setUploadError('');
     setUploadStatus('');
+
+    if (!auth.currentUser?.uid || auth.currentUser.uid !== user?.uid) {
+      setUploadError('Sessió no vàlida. Tanca sessió i torna a entrar.');
+      resetUploadInput();
+      return;
+    }
+
+    if (!tascaId || !selectedMaterial) {
+      setUploadError('No s\'ha pogut identificar la tasca. Torna a obrir-la i prova de nou.');
+      resetUploadInput();
+      return;
+    }
+
+    if (!esTasca(selectedMaterial)) {
+      setUploadError('Aquest material no és una tasca i no admet lliuraments.');
+      resetUploadInput();
+      return;
+    }
+
+    const entregaExist = entregasAlumne.find(
+      (entrega) => entrega.materialId === tascaId && entrega.alumneId === user.uid
+    );
+
+    if (entregaExist && esEntregaCompletada(entregaExist)) {
+      setUploadError('Aquesta tasca ja està qualificada i no es pot modificar.');
+      resetUploadInput();
+      return;
+    }
+
+    if (entregaExist?.estat === 'pendent_revisio') {
+      setUploadError('Ja tens una entrega pendent de revisió per aquesta tasca.');
+      resetUploadInput();
+      return;
+    }
+
+    const errorValidacio = validarFitxerEntrega(file);
+    if (errorValidacio) {
+      setUploadError(errorValidacio);
+      resetUploadInput();
+      return;
+    }
+
     setUploadingTascaId(tascaId);
-    setUploadStatus('Pujant fitxer a Cloudinary...');
+    setUploadStatus('Pujant fitxer...');
 
     const formData = new FormData();
     formData.append('file', file);
@@ -428,23 +579,19 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
         body: formData
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        throw new Error(data.error?.message || 'Error en la resposta de Cloudinary.');
+        throw new Error(data.error?.message || 'Cloudinary no ha pogut processar el fitxer.');
       }
 
       if (!data.secure_url) {
-        throw new Error('Cloudinary no ha retornat una URL vàlida (secure_url).');
+        throw new Error('Cloudinary no ha retornat una URL vàlida.');
       }
 
       const urlCloudinary = normalitzarUrlCloudinary(data.secure_url, file.name);
 
       setUploadStatus('Finalitzant entrega...');
-
-      if (!auth.currentUser?.uid) {
-        throw new Error('Sessió no vàlida. Inicia sessió de nou.');
-      }
 
       const dadesEntrega = {
         alumneNom: studentData?.nom || user?.displayName || user?.email || 'Alumne',
@@ -456,6 +603,8 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
         fileUrl: data.secure_url,
         urlCloudinary,
         fileName: file.name,
+        fileSize: file.size,
+        fileType: file.type || obtenirExtensioLocal(file.name),
         estat: 'pendent_revisio',
         data: serverTimestamp(),
         dataLliurament: serverTimestamp()
@@ -467,11 +616,9 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
       setUploadStatus('✅ Tasca lliurada correctament!');
     } catch (err) {
       console.error("Error en el procés d'entrega:", err);
-      const missatge =
-        err?.message ||
-        (err?.name === 'TypeError'
-          ? 'Error de xarxa en connectar amb Cloudinary. Comprova la connexió.'
-          : "No s'ha pogut completar l'entrega. Torna-ho a provar.");
+      const missatge = err?.name === 'TypeError'
+        ? 'Error de xarxa en pujar el fitxer. Comprova la connexió i torna-ho a provar.'
+        : err?.message || "No s'ha pogut completar l'entrega. Torna-ho a provar.";
       setUploadError(missatge);
       setUploadStatus('');
     } finally {
@@ -482,6 +629,13 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
 
   const teNota = teNotaValida(entregaActual);
   const tascaCompletada = esEntregaCompletada(entregaActual);
+  const entregaPendentRevisio = Boolean(entregaActual && !tascaCompletada);
+  const pujadaBloquejada = tascaCompletada || entregaPendentRevisio;
+  const missatgeBloqueigPujada = tascaCompletada
+    ? 'Aquesta tasca ja està qualificada i no es pot modificar.'
+    : entregaPendentRevisio
+      ? 'Ja tens una entrega pendent de revisió. Espera la correcció del professor.'
+      : '';
 
   const DataLimitIndicador = ({ m, esTasca, entrega, colors }) => {
     if (!esTasca(m) || !m.dataLimit || entrega) return null;
@@ -743,6 +897,7 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
             <div style={{ display: isMobile ? (menuMobilObert ? 'flex' : 'none') : 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? '10px' : '40px', alignItems: isMobile ? 'flex-start' : 'center', position: isMobile ? 'absolute' : 'static', top: isMobile ? '100%' : 'auto', left: isMobile ? '0' : 'auto', right: isMobile ? '0' : 'auto', backgroundColor: isMobile ? 'white' : 'transparent', padding: isMobile ? '20px' : '0', borderBottom: isMobile ? `1px solid ${colors.border}` : 'none', boxShadow: isMobile ? '0 4px 20px rgba(0,0,0,0.1)' : 'none', zIndex: isMobile ? '1000' : 'auto' }}>
               <button onClick={() => { setView('inici'); setMenuMobilObert(false); }} style={navLink(view === 'inici', colors)}>Inici</button>
               <button onClick={() => { setView('materials'); setMenuMobilObert(false); }} style={navLink(view === 'materials', colors)}>Aula Virtual</button>
+              <button onClick={() => { setView('exercicis'); setMenuMobilObert(false); }} style={navLink(view === 'exercicis', colors)}>🧠 Exercicis</button>
               <button onClick={() => { setView('consultes'); setMenuMobilObert(false); }} style={navLink(view === 'consultes', colors)}>💬 Consultes Privades</button>
               <button onClick={() => signOut(auth)} style={logoutBtn(colors)}>Tancar sessió</button>
             </div>
@@ -1001,12 +1156,12 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
                   <h3 style={{ fontSize: '1.6rem', margin: 0, fontWeight: '900' }}>El teu lliurament</h3>
                   <div style={{ fontSize: '0.85rem', color: colors.textLight, fontWeight: '700', backgroundColor: '#fff', padding: '5px 12px', borderRadius: '8px', border: `1px solid ${colors.border}` }}>
-                    Mida màxima: 50MB
+                    PDF, JPG, PNG, DOCX · màx. 50MB
                   </div>
                 </div>
                 
                 <div style={{ marginBottom: '35px' }}>
-                  <label style={uploadDropzoneStyle(isUploading, colors, tascaCompletada, isMobile)}>
+                  <label style={uploadDropzoneStyle(isUploading, colors, pujadaBloquejada, isMobile)}>
                     {isUploading ? (
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>
                         <div className="spinner-white"></div>
@@ -1016,20 +1171,21 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
                       <div>
                         <div style={{ fontSize: '3rem', marginBottom: '20px' }}>📤</div>
                         <div style={{ fontSize: '1.3rem', fontWeight: '900' }}>Prem aquí per seleccionar el fitxer</div>
-                        <div style={{ fontSize: '1rem', fontWeight: '500', marginTop: '10px', opacity: 0.7 }}>Admet PDF, ZIP, DOCX i Imatges</div>
+                        <div style={{ fontSize: '1rem', fontWeight: '500', marginTop: '10px', opacity: 0.7 }}>Admet PDF, JPG, PNG i DOCX</div>
                       </div>
                     )}
                     <input
                       ref={fileInputRef}
                       type="file"
+                      accept={ACCEPT_UPLOAD_TYPES}
                       hidden
                       onChange={handlePujarFitxer}
-                      disabled={isUploading || tascaCompletada}
+                      disabled={isUploading || pujadaBloquejada}
                     />
                   </label>
-                  {tascaCompletada && (
+                  {missatgeBloqueigPujada && (
                     <p style={{ textAlign: 'center', color: colors.textLight, fontSize: '0.9rem', marginTop: '12px', fontWeight: '600' }}>
-                      Aquesta tasca ja està tancada. No cal tornar a pujar el fitxer.
+                      {missatgeBloqueigPujada}
                     </p>
                   )}
                   
@@ -1073,6 +1229,15 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
               </div>
             )}
           </div>
+        )}
+
+        {view === 'exercicis' && (
+          <ExercicisAutocorregibles
+            user={user}
+            studentData={studentData}
+            colors={colors}
+            isMobile={isMobile}
+          />
         )}
 
         {view === 'consultes' && (
@@ -1234,6 +1399,182 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
         button { transition: all 0.2s ease; border: none; background: none; }
         button:hover { filter: brightness(0.9); transform: translateY(-2px); }
       `}</style>
+    </div>
+  );
+}
+
+
+function ExercicisAutocorregibles({ user, studentData, colors, isMobile }) {
+  const [respostes, setRespostes] = useState({});
+  const [feedback, setFeedback] = useState({});
+  const [pistesVisibles, setPistesVisibles] = useState({});
+  const [guardantId, setGuardantId] = useState(null);
+
+  const registrarIntent = async (exercici, respostaAlumne, correcta) => {
+    if (!user?.uid) return;
+
+    await addDoc(collection(db, 'exercicis_intents'), {
+      alumneId: user.uid,
+      alumneNom: studentData?.nom || user?.displayName || user?.email || 'Alumne',
+      curs: studentData?.curs || 'Curs no especificat',
+      exerciciId: exercici.id,
+      tema: exercici.tema,
+      nivell: exercici.nivell,
+      enunciat: exercici.enunciat,
+      respostaAlumne,
+      respostaCorrecta: exercici.resposta,
+      correcta,
+      tipusError: correcta ? null : exercici.tipusErrorSiFalla,
+      data: serverTimestamp()
+    });
+  };
+
+  const corregirExercici = async (exercici) => {
+    const respostaAlumne = respostes[exercici.id] || '';
+
+    if (!respostaAlumne.trim()) {
+      setFeedback((prev) => ({
+        ...prev,
+        [exercici.id]: {
+          tipus: 'error',
+          text: 'Escriu una resposta abans de corregir.'
+        }
+      }));
+      return;
+    }
+
+    const correcta = respostaEsCorrecta(respostaAlumne, exercici);
+    setGuardantId(exercici.id);
+
+    try {
+      await registrarIntent(exercici, respostaAlumne, correcta);
+      setFeedback((prev) => ({
+        ...prev,
+        [exercici.id]: correcta
+          ? { tipus: 'correcte', text: `Molt bé! ${exercici.explicacio}` }
+          : { tipus: 'error', text: `Encara no és correcte. ${exercici.pista1}` }
+      }));
+    } catch (error) {
+      console.error('Error registrant intent autocorregible:', error);
+      setFeedback((prev) => ({
+        ...prev,
+        [exercici.id]: correcta
+          ? { tipus: 'correcte', text: `Resposta correcta. No s’ha pogut guardar l’intent, però pots continuar.` }
+          : { tipus: 'error', text: `No és correcte. ${exercici.pista1} A més, no s’ha pogut guardar l’intent.` }
+      }));
+    } finally {
+      setGuardantId(null);
+    }
+  };
+
+  const mostrarPista = (exercici) => {
+    setPistesVisibles((prev) => {
+      const actual = prev[exercici.id] || 0;
+      return { ...prev, [exercici.id]: Math.min(actual + 1, 2) };
+    });
+  };
+
+  const reiniciarExercici = (exerciciId) => {
+    setRespostes((prev) => ({ ...prev, [exerciciId]: '' }));
+    setFeedback((prev) => ({ ...prev, [exerciciId]: null }));
+    setPistesVisibles((prev) => ({ ...prev, [exerciciId]: 0 }));
+  };
+
+  const exercicisPerTema = EXERCICIS_AUTOCORREGIBLES.reduce((acc, exercici) => {
+    acc[exercici.tema] = acc[exercici.tema] || [];
+    acc[exercici.tema].push(exercici);
+    return acc;
+  }, {});
+
+  return (
+    <div className="fade-in">
+      <div style={{ marginBottom: '35px' }}>
+        <h2 style={{ fontWeight: '900', fontSize: isMobile ? '2rem' : '2.5rem', color: colors.textDark, margin: 0, letterSpacing: '-1.5px' }}>
+          Exercicis autocorregibles
+        </h2>
+        <div style={{ height: '6px', width: '80px', backgroundColor: colors.primary, marginTop: '15px', borderRadius: '10px' }}></div>
+        <p style={{ color: colors.textLight, fontWeight: '600', lineHeight: 1.7, marginTop: '18px', maxWidth: '760px' }}>
+          Practica amb correcció immediata. Cada intent queda registrat perquè més endavant puguem detectar errors freqüents i recomanar-te exercicis adaptats.
+        </p>
+      </div>
+
+      {Object.entries(exercicisPerTema).map(([tema, exercicis]) => (
+        <section key={tema} style={{ marginBottom: '45px' }}>
+          <h3 style={{ fontSize: '1.4rem', fontWeight: '900', color: colors.textDark, marginBottom: '20px' }}>{tema}</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(290px, 1fr))', gap: '22px' }}>
+            {exercicis.map((exercici) => {
+              const fb = feedback[exercici.id];
+              const numPistes = pistesVisibles[exercici.id] || 0;
+              const guardant = guardantId === exercici.id;
+
+              return (
+                <article key={exercici.id} style={{ background: colors.card, border: `1px solid ${colors.border}`, borderRadius: '24px', padding: '26px', boxShadow: '0 12px 30px rgba(0,0,0,0.03)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'flex-start', marginBottom: '16px' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: '900', color: colors.primary, backgroundColor: '#eff6ff', padding: '6px 10px', borderRadius: '999px', textTransform: 'uppercase' }}>
+                      {exercici.nivell}
+                    </span>
+                    <span style={{ fontSize: '1.5rem' }}>🧮</span>
+                  </div>
+
+                  <div style={{ fontSize: '1.08rem', color: colors.textDark, fontWeight: '800', lineHeight: 1.55, marginBottom: '18px' }}>
+                    {exercici.enunciat}
+                  </div>
+
+                  <input
+                    type="text"
+                    value={respostes[exercici.id] || ''}
+                    onChange={(e) => setRespostes((prev) => ({ ...prev, [exercici.id]: e.target.value }))}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') corregirExercici(exercici);
+                    }}
+                    placeholder="Escriu la resposta..."
+                    style={{ width: '100%', boxSizing: 'border-box', border: `1.5px solid ${colors.border}`, borderRadius: '14px', padding: '14px 16px', fontSize: '1rem', fontWeight: '700', color: colors.textDark, outline: 'none', marginBottom: '14px' }}
+                  />
+
+                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                    <button
+                      onClick={() => corregirExercici(exercici)}
+                      disabled={guardant}
+                      style={{ padding: '11px 16px', borderRadius: '12px', backgroundColor: colors.primary, color: 'white', fontWeight: '900', cursor: guardant ? 'wait' : 'pointer' }}
+                    >
+                      {guardant ? 'Guardant...' : 'Corregir'}
+                    </button>
+                    <button
+                      onClick={() => mostrarPista(exercici)}
+                      style={{ padding: '11px 16px', borderRadius: '12px', backgroundColor: '#f8fafc', color: colors.textDark, border: `1px solid ${colors.border}`, fontWeight: '900', cursor: 'pointer' }}
+                    >
+                      Pista
+                    </button>
+                    <button
+                      onClick={() => reiniciarExercici(exercici.id)}
+                      style={{ padding: '11px 16px', borderRadius: '12px', backgroundColor: 'white', color: colors.textLight, border: `1px solid ${colors.border}`, fontWeight: '900', cursor: 'pointer' }}
+                    >
+                      Reiniciar
+                    </button>
+                  </div>
+
+                  {numPistes >= 1 && (
+                    <div style={{ marginTop: '16px', padding: '13px 15px', backgroundColor: '#fffbeb', borderLeft: `4px solid ${colors.warning}`, borderRadius: '10px', color: colors.textDark, fontWeight: '650', lineHeight: 1.55 }}>
+                      💡 {exercici.pista1}
+                    </div>
+                  )}
+                  {numPistes >= 2 && (
+                    <div style={{ marginTop: '10px', padding: '13px 15px', backgroundColor: '#fff7ed', borderLeft: `4px solid ${colors.warning}`, borderRadius: '10px', color: colors.textDark, fontWeight: '650', lineHeight: 1.55 }}>
+                      💡 {exercici.pista2}
+                    </div>
+                  )}
+
+                  {fb && (
+                    <div style={{ marginTop: '16px', padding: '14px 16px', borderRadius: '14px', backgroundColor: fb.tipus === 'correcte' ? '#f0fdf4' : '#fef2f2', border: `1px solid ${fb.tipus === 'correcte' ? colors.success : colors.danger}`, color: fb.tipus === 'correcte' ? colors.success : colors.danger, fontWeight: '800', lineHeight: 1.55 }}>
+                      {fb.tipus === 'correcte' ? '✅ ' : '❌ '}{fb.text}
+                    </div>
+                  )}
+                </article>
+              );
+            })}
+          </div>
+        </section>
+      ))}
     </div>
   );
 }
