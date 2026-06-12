@@ -257,6 +257,13 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
   const [recursTema, setRecursTema] = useState('');
   const [temaLliure, setTemaLliure] = useState('');
   const [recursDataLimit, setRecursDataLimit] = useState('');
+  const [exerciciNivell, setExerciciNivell] = useState('');
+  const [exerciciEnunciat, setExerciciEnunciat] = useState('');
+  const [exerciciResposta, setExerciciResposta] = useState('');
+  const [exerciciAlternatives, setExerciciAlternatives] = useState('');
+  const [exerciciPista1, setExerciciPista1] = useState('');
+  const [exerciciPista2, setExerciciPista2] = useState('');
+  const [exerciciExplicacio, setExerciciExplicacio] = useState('');
 
   const [activeTab, setActiveTab] = useState('avisos');
   const [expandedCurs, setExpandedCurs] = useState(null);
@@ -326,6 +333,7 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
   }, []);
 
   const esTasca = (material) => material?.tipus?.toLowerCase().includes('tasca');
+  const esExerciciAutocorregible = (material) => material?.tipus?.toLowerCase().includes('exercici');
 
   const entregaPertanyAMaterial = (entrega, material) => {
     if (!entrega || !material) return false;
@@ -580,7 +588,11 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
 
   const handlePublicarMaterial = async () => {
     const temaFinal = temaLliure || recursTema;
+    const esExercici = recursTipus?.toLowerCase().includes('exercici');
     if (!recursTitol || recursCursos.length === 0 || !temaFinal) return alert('Falten dades.');
+    if (esExercici && (!exerciciEnunciat.trim() || !exerciciResposta.trim())) {
+      return alert('Per crear un exercici autocorregible cal escriure l’enunciat i la resposta correcta.');
+    }
     setIsPublishing(true);
     try {
       if (temaLliure) {
@@ -591,16 +603,32 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
           }
         }
       }
-      await addDoc(collection(db, 'materials'), {
+      const materialNou = {
         titol: recursTitol,
-        url: recursUrl,
+        url: esExercici ? '' : recursUrl,
         descripcio: recursDescripcio,
         cursos: recursCursos,
         tipus: recursTipus,
         tema: temaFinal,
         data: serverTimestamp(),
         dataLimit: recursDataLimit || null
-      });
+      };
+
+      if (esExercici) {
+        materialNou.enunciat = exerciciEnunciat.trim();
+        materialNou.resposta = exerciciResposta.trim();
+        materialNou.alternatives = exerciciAlternatives
+          .split('\n')
+          .map((alt) => alt.trim())
+          .filter(Boolean);
+        materialNou.pista1 = exerciciPista1.trim();
+        materialNou.pista2 = exerciciPista2.trim();
+        materialNou.explicacio = exerciciExplicacio.trim();
+        materialNou.nivell = exerciciNivell.trim();
+        materialNou.tipusErrorSiFalla = 'exercici_creat_admin';
+      }
+
+      await addDoc(collection(db, 'materials'), materialNou);
       await handleNotificar('material', recursTitol, `Nou material: ${recursTitol}`, recursCursos);
       setRecursTitol('');
       setRecursUrl('');
@@ -609,7 +637,14 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
       setTemaLliure('');
       setRecursCursos([]);
       setRecursDataLimit('');
-      alert('Material publicat.');
+      setExerciciNivell('');
+      setExerciciEnunciat('');
+      setExerciciResposta('');
+      setExerciciAlternatives('');
+      setExerciciPista1('');
+      setExerciciPista2('');
+      setExerciciExplicacio('');
+      alert(esExercici ? 'Exercici publicat.' : 'Material publicat.');
     } catch (e) {
       alert(e.message);
     } finally {
@@ -873,10 +908,12 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
           </div>
 
           <div style={cardStyle(colors)}>
-            <h3 style={cardTitleStyle(colors)}>📚 Pujar Material / Tasca</h3>
+            <h3 style={cardTitleStyle(colors)}>📚 Crear contingut</h3>
             <input placeholder="Títol" value={recursTitol} onChange={(e) => setRecursTitol(e.target.value)} style={inputStyle(colors)} />
-            <input placeholder="URL" value={recursUrl} onChange={(e) => setRecursUrl(e.target.value)} style={inputStyle(colors)} />
-            <textarea placeholder="Descripció..." value={recursDescripcio} onChange={(e) => setRecursDescripcio(e.target.value)} style={{ ...textareaStyle(colors), height: '60px' }} />
+            {!recursTipus?.toLowerCase().includes('exercici') && (
+              <input placeholder="URL" value={recursUrl} onChange={(e) => setRecursUrl(e.target.value)} style={inputStyle(colors)} />
+            )}
+            <textarea placeholder={recursTipus?.toLowerCase().includes('exercici') ? 'Descripció breu o instruccions generals...' : 'Descripció...'} value={recursDescripcio} onChange={(e) => setRecursDescripcio(e.target.value)} style={{ ...textareaStyle(colors), height: '60px' }} />
             {recursTipus?.toLowerCase().includes('tasca') && (
               <div style={{ marginBottom: '12px' }}>
                 <label style={{ fontSize: '0.75rem', fontWeight: '700', color: colors.textLight, display: 'block', marginBottom: '6px' }}>
@@ -892,10 +929,23 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
               </div>
             )}
 
+            {recursTipus?.toLowerCase().includes('exercici') && (
+              <div style={{ marginBottom: '16px', padding: '14px', backgroundColor: '#f8fafc', border: `1px solid ${colors.border}`, borderRadius: '14px' }}>
+                <div style={{ fontSize: '0.8rem', color: colors.textDark, marginBottom: '10px', fontWeight: '800' }}>🧠 Dades de l’exercici autocorregible</div>
+                <input placeholder="Nivell (ex. 1r ESO, Batxillerat...)" value={exerciciNivell} onChange={(e) => setExerciciNivell(e.target.value)} style={inputStyle(colors)} />
+                <textarea placeholder="Enunciat de l’exercici..." value={exerciciEnunciat} onChange={(e) => setExerciciEnunciat(e.target.value)} style={{ ...textareaStyle(colors), height: '90px' }} />
+                <input placeholder="Resposta correcta" value={exerciciResposta} onChange={(e) => setExerciciResposta(e.target.value)} style={inputStyle(colors)} />
+                <textarea placeholder={'Respostes alternatives acceptades (una per línia)'} value={exerciciAlternatives} onChange={(e) => setExerciciAlternatives(e.target.value)} style={{ ...textareaStyle(colors), height: '70px' }} />
+                <input placeholder="Pista 1" value={exerciciPista1} onChange={(e) => setExerciciPista1(e.target.value)} style={inputStyle(colors)} />
+                <input placeholder="Pista 2" value={exerciciPista2} onChange={(e) => setExerciciPista2(e.target.value)} style={inputStyle(colors)} />
+                <textarea placeholder="Explicació que veurà l’alumne si encerta..." value={exerciciExplicacio} onChange={(e) => setExerciciExplicacio(e.target.value)} style={{ ...textareaStyle(colors), height: '70px' }} />
+              </div>
+            )}
+
             <div style={{ marginBottom: '12px' }}>
               <div style={{ fontSize: '0.75rem', color: colors.textLight, marginBottom: '8px', fontWeight: '600' }}>Tipus</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                {Object.keys(APP_CONFIG?.tipusIcons || {}).map((t) => (
+                {[...new Set([...Object.keys(APP_CONFIG?.tipusIcons || {}), 'Exercici autocorregible'])].map((t) => (
                   <button
                     key={t}
                     type="button"
@@ -915,7 +965,7 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
                       transition: 'all 0.15s'
                     }}
                   >
-                    <span>{APP_CONFIG?.tipusIcons?.[t]}</span>
+                    <span>{APP_CONFIG?.tipusIcons?.[t] || (t.toLowerCase().includes('exercici') ? '🧠' : '📄')}</span>
                     <span>{t}</span>
                   </button>
                 ))}
@@ -1074,7 +1124,7 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
                         return (
                           <div key={m.id} style={materialRow(colors, isMobile)}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0 }}>
-                              <span style={{ fontSize: '1.2rem' }}>{APP_CONFIG?.tipusIcons?.[m.tipus] || '📄'}</span>
+                              <span style={{ fontSize: '1.2rem' }}>{APP_CONFIG?.tipusIcons?.[m.tipus] || (esExerciciAutocorregible(m) ? '🧠' : '📄')}</span>
                               <div style={{ minWidth: 0 }}>
                                 <div style={{ fontWeight: '600', fontSize: '0.9rem' }}>{m.titol}</div>
                                 <div style={{ fontSize: '0.7rem', color: colors.textLight }}>{m.tema} · {m.tipus}</div>

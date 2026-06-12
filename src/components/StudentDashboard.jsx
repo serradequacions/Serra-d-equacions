@@ -76,81 +76,6 @@ const ENLLACES_WHATSAPP_DASHBOARD = {
   "2n Batxillerat CCSS": "https://chat.whatsapp.com/CSyHjZsxz3gBzyqGyK0USI",
 };
 
-const EXERCICIS_AUTOCORREGIBLES = [
-  {
-    id: 'eq1_transposicio_001',
-    tema: 'Equacions',
-    nivell: 'ESO',
-    enunciat: 'Resol l’equació: 2x + 5 = 17',
-    resposta: '6',
-    alternatives: ['x=6', 'x = 6'],
-    pista1: 'Primer resta 5 als dos membres de l’equació.',
-    pista2: 'Queda 2x = 12. Ara divideix entre 2.',
-    explicacio: '2x + 5 = 17 → 2x = 12 → x = 6.',
-    tipusErrorSiFalla: 'transposicio_equacions'
-  },
-  {
-    id: 'pct_001',
-    tema: 'Percentatges',
-    nivell: 'ESO',
-    enunciat: 'Calcula el 15% de 80.',
-    resposta: '12',
-    alternatives: ['12,0', '12.0'],
-    pista1: '15% vol dir 15 de cada 100.',
-    pista2: 'Calcula 80 · 15 / 100.',
-    explicacio: '80 · 0,15 = 12.',
-    tipusErrorSiFalla: 'percentatge_basic'
-  },
-  {
-    id: 'funcions_pendent_001',
-    tema: 'Funcions',
-    nivell: 'ESO/Batxillerat',
-    enunciat: 'Quina és la pendent de la recta y = 3x - 2?',
-    resposta: '3',
-    alternatives: ['m=3', 'm = 3'],
-    pista1: 'En una recta y = mx + n, la pendent és el nombre que multiplica la x.',
-    pista2: 'Compara y = 3x - 2 amb y = mx + n.',
-    explicacio: 'La pendent és m = 3.',
-    tipusErrorSiFalla: 'identificacio_pendent'
-  },
-  {
-    id: 'sistemes_001',
-    tema: 'Sistemes',
-    nivell: 'ESO',
-    enunciat: 'Si x + y = 10 i x = 4, quin valor té y?',
-    resposta: '6',
-    alternatives: ['y=6', 'y = 6'],
-    pista1: 'Substitueix x per 4 dins x + y = 10.',
-    pista2: 'Queda 4 + y = 10.',
-    explicacio: '4 + y = 10 → y = 6.',
-    tipusErrorSiFalla: 'substitucio_sistemes'
-  },
-  {
-    id: 'derivades_001',
-    tema: 'Derivades',
-    nivell: 'Batxillerat',
-    enunciat: 'Deriva la funció f(x) = x².',
-    resposta: '2x',
-    alternatives: ['f’(x)=2x', "f'(x)=2x", 'f’(x) = 2x', "f'(x) = 2x"],
-    pista1: 'Recorda la regla: la derivada de xⁿ és n·xⁿ⁻¹.',
-    pista2: 'Aquí n = 2.',
-    explicacio: 'La derivada de x² és 2x.',
-    tipusErrorSiFalla: 'regla_potencia_derivades'
-  },
-  {
-    id: 'probabilitat_001',
-    tema: 'Probabilitat',
-    nivell: 'ESO/Batxillerat',
-    enunciat: 'En una bossa hi ha 3 bolles vermelles i 2 blaves. Quina és la probabilitat de treure una bolla blava? Dona la resposta en fracció.',
-    resposta: '2/5',
-    alternatives: ['2 de 5', '0,4', '0.4', '40%'],
-    pista1: 'La probabilitat és casos favorables dividit entre casos possibles.',
-    pista2: 'Hi ha 2 bolles blaves i 5 bolles en total.',
-    explicacio: 'P(blava) = 2/5, que també és 0,4 o 40%.',
-    tipusErrorSiFalla: 'probabilitat_laplace'
-  }
-];
-
 const normalitzarRespostaExercici = (valor = '') =>
   String(valor)
     .toLowerCase()
@@ -219,6 +144,7 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
   };
 
   const esTasca = (m) => m.tipus?.toLowerCase().includes('tasca');
+  const esExerciciAutocorregible = (m) => m?.tipus?.toLowerCase().includes('exercici');
 
   const obtenirEntregaPerMaterial = (materialId) =>
     entregasAlumne.find((e) => e.materialId === materialId);
@@ -681,7 +607,7 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '22px' }}>
-          <span style={{ fontSize: '2rem' }}>{esSolucionari && !desbloquejat ? '🔒' : (APP_CONFIG.tipusIcons[m.tipus] || '📄')}</span>
+          <span style={{ fontSize: '2rem' }}>{esSolucionari && !desbloquejat ? '🔒' : (APP_CONFIG.tipusIcons[m.tipus] || (esExerciciAutocorregible(m) ? '🧠' : '📄'))}</span>
           <div>
             <div style={{ fontWeight: '800', color: colors.textDark, fontSize: '1.15rem' }}>{m.titol}</div>
             <div style={{ fontSize: '0.8rem', color: colors.textLight, textTransform: 'uppercase', fontWeight: '800', marginTop: '4px' }}>
@@ -897,7 +823,6 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
             <div style={{ display: isMobile ? (menuMobilObert ? 'flex' : 'none') : 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? '10px' : '40px', alignItems: isMobile ? 'flex-start' : 'center', position: isMobile ? 'absolute' : 'static', top: isMobile ? '100%' : 'auto', left: isMobile ? '0' : 'auto', right: isMobile ? '0' : 'auto', backgroundColor: isMobile ? 'white' : 'transparent', padding: isMobile ? '20px' : '0', borderBottom: isMobile ? `1px solid ${colors.border}` : 'none', boxShadow: isMobile ? '0 4px 20px rgba(0,0,0,0.1)' : 'none', zIndex: isMobile ? '1000' : 'auto' }}>
               <button onClick={() => { setView('inici'); setMenuMobilObert(false); }} style={navLink(view === 'inici', colors)}>Inici</button>
               <button onClick={() => { setView('materials'); setMenuMobilObert(false); }} style={navLink(view === 'materials', colors)}>Aula Virtual</button>
-              <button onClick={() => { setView('exercicis'); setMenuMobilObert(false); }} style={navLink(view === 'exercicis', colors)}>🧠 Exercicis</button>
               <button onClick={() => { setView('consultes'); setMenuMobilObert(false); }} style={navLink(view === 'consultes', colors)}>💬 Consultes Privades</button>
               <button onClick={() => { setView('assistent'); setMenuMobilObert(false); }} style={navLink(view === 'assistent', colors)}>🤖 Assistent IA</button>
               <button onClick={() => signOut(auth)} style={logoutBtn(colors)}>Tancar sessió</button>
@@ -1075,7 +1000,7 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
             
             <div style={{ display: 'flex', alignItems: 'center', gap: '30px', marginBottom: '40px' }}>
               <div style={iconCircle(colors, colors.bg, colors.primary)}>
-                {APP_CONFIG.tipusIcons[selectedMaterial.tipus]}
+                {APP_CONFIG.tipusIcons[selectedMaterial.tipus] || (esExerciciAutocorregible(selectedMaterial) ? '🧠' : '📄')}
               </div>
               <div>
                 <h2 style={{ margin: 0, fontWeight: '900', fontSize: '2.2rem', letterSpacing: '-1px' }}>{selectedMaterial.titol}</h2>
@@ -1120,6 +1045,15 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
                   <div style={{ fontSize: '1.5rem', color: colors.textLight }}>🔒</div>
                 </div>
               )
+            )}
+
+            {esExerciciAutocorregible(selectedMaterial) && (
+              <ExerciciAutocorregibleCard
+                exercici={selectedMaterial}
+                user={user}
+                studentData={studentData}
+                colors={colors}
+              />
             )}
 
             {selectedMaterial.tipus?.toLowerCase().includes('tasca') && (
@@ -1230,15 +1164,6 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
               </div>
             )}
           </div>
-        )}
-
-        {view === 'exercicis' && (
-          <ExercicisAutocorregibles
-            user={user}
-            studentData={studentData}
-            colors={colors}
-            isMobile={isMobile}
-          />
         )}
 
         {view === 'consultes' && (
@@ -1414,13 +1339,14 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
 }
 
 
-function ExercicisAutocorregibles({ user, studentData, colors, isMobile }) {
-  const [respostes, setRespostes] = useState({});
-  const [feedback, setFeedback] = useState({});
-  const [pistesVisibles, setPistesVisibles] = useState({});
-  const [guardantId, setGuardantId] = useState(null);
 
-  const registrarIntent = async (exercici, respostaAlumne, correcta) => {
+function ExerciciAutocorregibleCard({ exercici, user, studentData, colors }) {
+  const [resposta, setResposta] = useState('');
+  const [feedback, setFeedback] = useState(null);
+  const [pistesVisibles, setPistesVisibles] = useState(0);
+  const [guardant, setGuardant] = useState(false);
+
+  const registrarIntent = async (respostaAlumne, correcta) => {
     if (!user?.uid) return;
 
     await addDoc(collection(db, 'exercicis_intents'), {
@@ -1428,163 +1354,118 @@ function ExercicisAutocorregibles({ user, studentData, colors, isMobile }) {
       alumneNom: studentData?.nom || user?.displayName || user?.email || 'Alumne',
       curs: studentData?.curs || 'Curs no especificat',
       exerciciId: exercici.id,
-      tema: exercici.tema,
-      nivell: exercici.nivell,
-      enunciat: exercici.enunciat,
+      materialId: exercici.id,
+      tema: exercici.tema || 'Sense tema',
+      nivell: exercici.nivell || '',
+      enunciat: exercici.enunciat || exercici.descripcio || '',
       respostaAlumne,
-      respostaCorrecta: exercici.resposta,
+      respostaCorrecta: exercici.resposta || '',
       correcta,
-      tipusError: correcta ? null : exercici.tipusErrorSiFalla,
+      tipusError: correcta ? null : (exercici.tipusErrorSiFalla || 'error_exercici_autocorregible'),
       data: serverTimestamp()
     });
   };
 
-  const corregirExercici = async (exercici) => {
-    const respostaAlumne = respostes[exercici.id] || '';
+  const corregirExercici = async () => {
+    const respostaAlumne = resposta || '';
 
     if (!respostaAlumne.trim()) {
-      setFeedback((prev) => ({
-        ...prev,
-        [exercici.id]: {
-          tipus: 'error',
-          text: 'Escriu una resposta abans de corregir.'
-        }
-      }));
+      setFeedback({ tipus: 'error', text: 'Escriu una resposta abans de corregir.' });
       return;
     }
 
     const correcta = respostaEsCorrecta(respostaAlumne, exercici);
-    setGuardantId(exercici.id);
+    setGuardant(true);
 
     try {
-      await registrarIntent(exercici, respostaAlumne, correcta);
-      setFeedback((prev) => ({
-        ...prev,
-        [exercici.id]: correcta
-          ? { tipus: 'correcte', text: `Molt bé! ${exercici.explicacio}` }
-          : { tipus: 'error', text: `Encara no és correcte. ${exercici.pista1}` }
-      }));
+      await registrarIntent(respostaAlumne, correcta);
+      setFeedback(
+        correcta
+          ? { tipus: 'correcte', text: `Molt bé! ${exercici.explicacio || 'Resposta correcta.'}` }
+          : { tipus: 'error', text: `Encara no és correcte. ${exercici.pista1 || 'Revisa el procediment i torna-ho a provar.'}` }
+      );
     } catch (error) {
       console.error('Error registrant intent autocorregible:', error);
-      setFeedback((prev) => ({
-        ...prev,
-        [exercici.id]: correcta
-          ? { tipus: 'correcte', text: `Resposta correcta. No s’ha pogut guardar l’intent, però pots continuar.` }
-          : { tipus: 'error', text: `No és correcte. ${exercici.pista1} A més, no s’ha pogut guardar l’intent.` }
-      }));
+      setFeedback(
+        correcta
+          ? { tipus: 'correcte', text: 'Resposta correcta. No s’ha pogut guardar l’intent, però pots continuar.' }
+          : { tipus: 'error', text: `No és correcte. ${exercici.pista1 || 'Revisa el procediment.'} A més, no s’ha pogut guardar l’intent.` }
+      );
     } finally {
-      setGuardantId(null);
+      setGuardant(false);
     }
   };
 
-  const mostrarPista = (exercici) => {
-    setPistesVisibles((prev) => {
-      const actual = prev[exercici.id] || 0;
-      return { ...prev, [exercici.id]: Math.min(actual + 1, 2) };
-    });
+  const reiniciarExercici = () => {
+    setResposta('');
+    setFeedback(null);
+    setPistesVisibles(0);
   };
-
-  const reiniciarExercici = (exerciciId) => {
-    setRespostes((prev) => ({ ...prev, [exerciciId]: '' }));
-    setFeedback((prev) => ({ ...prev, [exerciciId]: null }));
-    setPistesVisibles((prev) => ({ ...prev, [exerciciId]: 0 }));
-  };
-
-  const exercicisPerTema = EXERCICIS_AUTOCORREGIBLES.reduce((acc, exercici) => {
-    acc[exercici.tema] = acc[exercici.tema] || [];
-    acc[exercici.tema].push(exercici);
-    return acc;
-  }, {});
 
   return (
-    <div className="fade-in">
-      <div style={{ marginBottom: '35px' }}>
-        <h2 style={{ fontWeight: '900', fontSize: isMobile ? '2rem' : '2.5rem', color: colors.textDark, margin: 0, letterSpacing: '-1.5px' }}>
-          Exercicis autocorregibles
-        </h2>
-        <div style={{ height: '6px', width: '80px', backgroundColor: colors.primary, marginTop: '15px', borderRadius: '10px' }}></div>
-        <p style={{ color: colors.textLight, fontWeight: '600', lineHeight: 1.7, marginTop: '18px', maxWidth: '760px' }}>
-          Practica amb correcció immediata. Cada intent queda registrat perquè més endavant puguem detectar errors freqüents i recomanar-te exercicis adaptats.
-        </p>
+    <div style={{ marginTop: '35px', padding: '28px', backgroundColor: '#f8fafc', border: `1px solid ${colors.border}`, borderRadius: '24px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'flex-start', marginBottom: '18px' }}>
+        <h3 style={{ margin: 0, fontSize: '1.5rem', fontWeight: '900', color: colors.textDark }}>Exercici autocorregible</h3>
+        {exercici.nivell && (
+          <span style={{ fontSize: '0.75rem', fontWeight: '900', color: colors.primary, backgroundColor: '#eff6ff', padding: '6px 10px', borderRadius: '999px', textTransform: 'uppercase' }}>
+            {exercici.nivell}
+          </span>
+        )}
       </div>
 
-      {Object.entries(exercicisPerTema).map(([tema, exercicis]) => (
-        <section key={tema} style={{ marginBottom: '45px' }}>
-          <h3 style={{ fontSize: '1.4rem', fontWeight: '900', color: colors.textDark, marginBottom: '20px' }}>{tema}</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(290px, 1fr))', gap: '22px' }}>
-            {exercicis.map((exercici) => {
-              const fb = feedback[exercici.id];
-              const numPistes = pistesVisibles[exercici.id] || 0;
-              const guardant = guardantId === exercici.id;
+      <div style={{ fontSize: '1.08rem', color: colors.textDark, fontWeight: '800', lineHeight: 1.6, marginBottom: '18px', whiteSpace: 'pre-wrap' }}>
+        {exercici.enunciat || exercici.descripcio || 'Aquest exercici encara no té enunciat.'}
+      </div>
 
-              return (
-                <article key={exercici.id} style={{ background: colors.card, border: `1px solid ${colors.border}`, borderRadius: '24px', padding: '26px', boxShadow: '0 12px 30px rgba(0,0,0,0.03)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'flex-start', marginBottom: '16px' }}>
-                    <span style={{ fontSize: '0.75rem', fontWeight: '900', color: colors.primary, backgroundColor: '#eff6ff', padding: '6px 10px', borderRadius: '999px', textTransform: 'uppercase' }}>
-                      {exercici.nivell}
-                    </span>
-                    <span style={{ fontSize: '1.5rem' }}>🧮</span>
-                  </div>
+      <input
+        type="text"
+        value={resposta}
+        onChange={(e) => setResposta(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') corregirExercici();
+        }}
+        placeholder="Escriu la resposta..."
+        style={{ width: '100%', boxSizing: 'border-box', border: `1.5px solid ${colors.border}`, borderRadius: '14px', padding: '14px 16px', fontSize: '1rem', fontWeight: '700', color: colors.textDark, outline: 'none', marginBottom: '14px', backgroundColor: '#fff' }}
+      />
 
-                  <div style={{ fontSize: '1.08rem', color: colors.textDark, fontWeight: '800', lineHeight: 1.55, marginBottom: '18px' }}>
-                    {exercici.enunciat}
-                  </div>
+      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+        <button
+          onClick={corregirExercici}
+          disabled={guardant}
+          style={{ padding: '11px 16px', borderRadius: '12px', backgroundColor: colors.primary, color: 'white', fontWeight: '900', cursor: guardant ? 'wait' : 'pointer' }}
+        >
+          {guardant ? 'Guardant...' : 'Corregir'}
+        </button>
+        <button
+          onClick={() => setPistesVisibles((actual) => Math.min(actual + 1, 2))}
+          style={{ padding: '11px 16px', borderRadius: '12px', backgroundColor: '#fff', color: colors.textDark, border: `1px solid ${colors.border}`, fontWeight: '900', cursor: 'pointer' }}
+        >
+          Pista
+        </button>
+        <button
+          onClick={reiniciarExercici}
+          style={{ padding: '11px 16px', borderRadius: '12px', backgroundColor: 'white', color: colors.textLight, border: `1px solid ${colors.border}`, fontWeight: '900', cursor: 'pointer' }}
+        >
+          Reiniciar
+        </button>
+      </div>
 
-                  <input
-                    type="text"
-                    value={respostes[exercici.id] || ''}
-                    onChange={(e) => setRespostes((prev) => ({ ...prev, [exercici.id]: e.target.value }))}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') corregirExercici(exercici);
-                    }}
-                    placeholder="Escriu la resposta..."
-                    style={{ width: '100%', boxSizing: 'border-box', border: `1.5px solid ${colors.border}`, borderRadius: '14px', padding: '14px 16px', fontSize: '1rem', fontWeight: '700', color: colors.textDark, outline: 'none', marginBottom: '14px' }}
-                  />
+      {pistesVisibles >= 1 && exercici.pista1 && (
+        <div style={{ marginTop: '16px', padding: '13px 15px', backgroundColor: '#fffbeb', borderLeft: `4px solid ${colors.warning}`, borderRadius: '10px', color: colors.textDark, fontWeight: '650', lineHeight: 1.55 }}>
+          💡 {exercici.pista1}
+        </div>
+      )}
+      {pistesVisibles >= 2 && exercici.pista2 && (
+        <div style={{ marginTop: '10px', padding: '13px 15px', backgroundColor: '#fff7ed', borderLeft: `4px solid ${colors.warning}`, borderRadius: '10px', color: colors.textDark, fontWeight: '650', lineHeight: 1.55 }}>
+          💡 {exercici.pista2}
+        </div>
+      )}
 
-                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                    <button
-                      onClick={() => corregirExercici(exercici)}
-                      disabled={guardant}
-                      style={{ padding: '11px 16px', borderRadius: '12px', backgroundColor: colors.primary, color: 'white', fontWeight: '900', cursor: guardant ? 'wait' : 'pointer' }}
-                    >
-                      {guardant ? 'Guardant...' : 'Corregir'}
-                    </button>
-                    <button
-                      onClick={() => mostrarPista(exercici)}
-                      style={{ padding: '11px 16px', borderRadius: '12px', backgroundColor: '#f8fafc', color: colors.textDark, border: `1px solid ${colors.border}`, fontWeight: '900', cursor: 'pointer' }}
-                    >
-                      Pista
-                    </button>
-                    <button
-                      onClick={() => reiniciarExercici(exercici.id)}
-                      style={{ padding: '11px 16px', borderRadius: '12px', backgroundColor: 'white', color: colors.textLight, border: `1px solid ${colors.border}`, fontWeight: '900', cursor: 'pointer' }}
-                    >
-                      Reiniciar
-                    </button>
-                  </div>
-
-                  {numPistes >= 1 && (
-                    <div style={{ marginTop: '16px', padding: '13px 15px', backgroundColor: '#fffbeb', borderLeft: `4px solid ${colors.warning}`, borderRadius: '10px', color: colors.textDark, fontWeight: '650', lineHeight: 1.55 }}>
-                      💡 {exercici.pista1}
-                    </div>
-                  )}
-                  {numPistes >= 2 && (
-                    <div style={{ marginTop: '10px', padding: '13px 15px', backgroundColor: '#fff7ed', borderLeft: `4px solid ${colors.warning}`, borderRadius: '10px', color: colors.textDark, fontWeight: '650', lineHeight: 1.55 }}>
-                      💡 {exercici.pista2}
-                    </div>
-                  )}
-
-                  {fb && (
-                    <div style={{ marginTop: '16px', padding: '14px 16px', borderRadius: '14px', backgroundColor: fb.tipus === 'correcte' ? '#f0fdf4' : '#fef2f2', border: `1px solid ${fb.tipus === 'correcte' ? colors.success : colors.danger}`, color: fb.tipus === 'correcte' ? colors.success : colors.danger, fontWeight: '800', lineHeight: 1.55 }}>
-                      {fb.tipus === 'correcte' ? '✅ ' : '❌ '}{fb.text}
-                    </div>
-                  )}
-                </article>
-              );
-            })}
-          </div>
-        </section>
-      ))}
+      {feedback && (
+        <div style={{ marginTop: '16px', padding: '14px 16px', borderRadius: '14px', backgroundColor: feedback.tipus === 'correcte' ? '#f0fdf4' : '#fef2f2', border: `1px solid ${feedback.tipus === 'correcte' ? colors.success : colors.danger}`, color: feedback.tipus === 'correcte' ? colors.success : colors.danger, fontWeight: '800', lineHeight: 1.55 }}>
+          {feedback.tipus === 'correcte' ? '✅ ' : '❌ '}{feedback.text}
+        </div>
+      )}
     </div>
   );
 }
