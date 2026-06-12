@@ -248,7 +248,7 @@ export default function AIAssistant({
         }
 
         const data = await response.json();
-        resposta = data.answer || data.resposta || data.message || data?.choices?.[0]?.message?.content || '';
+        resposta = data.reply || data.answer || data.message || data?.choices?.[0]?.message?.content || '';
         setAiMode('connectat');
       }
 
