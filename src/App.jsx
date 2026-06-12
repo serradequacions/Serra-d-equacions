@@ -5,18 +5,19 @@ import { onAuthStateChanged } from 'firebase/auth';
 import LoginPage from './components/LoginPage';
 import AdminPanel from './components/AdminPanel';
 import StudentDashboard from './components/StudentDashboard';
+import AIAssistant from './components/AIAssistant';
 import logoImg from './logo.png';
 
 const APP_CONFIG = {
   adminEmail: "serradequacions@gmail.com",
   cloudName: "ducevp5vb",
   uploadPreset: "tasques_alumnes",
-  studentAIAssistantEndpoint: "https://serra-equacions-ai.serradequacions.workers.dev/",
   cursosOpcions: [
     "1r ESO", "2n ESO", "3r ESO", "4t ESO A", "4t ESO B", 
     "1r BATX CCSS", "1r BATX CIEN.", "2n BATX CCSS", "2n BATX CIEN"
   ],
-  tipusIcons: { 'Teoria': '📚', 'Exercici': '✍️', 'Vídeo': '🎥', 'Examen': '🏁', 'Tasca': '📂' }
+  tipusIcons: { 'Teoria': '📚', 'Exercici': '✍️', 'Vídeo': '🎥', 'Examen': '🏁', 'Tasca': '📂' },
+  studentAIAssistantEndpoint: 'https://serra-equacions-ai.serradequacions.workers.dev/'
 };
 
 export default function App() {
@@ -47,5 +48,28 @@ export default function App() {
     return <AdminPanel APP_CONFIG={APP_CONFIG} logoImg={logoImg} />;
   }
 
-  return <StudentDashboard user={user} APP_CONFIG={APP_CONFIG} logoImg={logoImg} />;
+  const assistantColors = {
+    primary: '#2563eb',
+    primaryDark: '#1d4ed8',
+    bg: '#f8fafc',
+    card: '#ffffff',
+    textDark: '#0f172a',
+    textLight: '#64748b',
+    border: '#e2e8f0',
+    danger: '#ef4444',
+    success: '#10b981',
+    accent: '#3b82f6',
+    warning: '#f59e0b'
+  };
+
+  return (
+    <>
+      <StudentDashboard user={user} APP_CONFIG={APP_CONFIG} logoImg={logoImg} />
+      <AIAssistant
+        variant="floating"
+        colors={assistantColors}
+        aiEndpoint={APP_CONFIG.studentAIAssistantEndpoint}
+      />
+    </>
+  );
 }
