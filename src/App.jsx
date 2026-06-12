@@ -9,6 +9,7 @@ import logoImg from './logo.png';
 
 const APP_CONFIG = {
   adminEmail: "serradequacions@gmail.com",
+  studentAIAssistantEndpoint: "https://serra-equacions-ai.serradequacions.workers.dev/",
   cloudName: "ducevp5vb",
   uploadPreset: "tasques_alumnes",
   cursosOpcions: [

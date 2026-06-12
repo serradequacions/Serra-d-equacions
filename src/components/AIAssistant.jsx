@@ -1,5 +1,4 @@
 import React, { useMemo, useRef, useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
 
 const DATA_CATEGORIES = {
   PLATFORM: 'plataforma',
@@ -185,7 +184,7 @@ export default function AIAssistant({
   onNavigate,
   aiEndpoint
 }) {
-  const [isOpen, setIsOpen] = useState(variant === 'embedded');
+  const [isOpen, setIsOpen] = useState(variant === 'embedded' || variant === 'floating');
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [aiMode, setAiMode] = useState(aiEndpoint ? 'connectat' : 'local');
@@ -394,8 +393,7 @@ export default function AIAssistant({
       </div>
     );
 
-    if (typeof document === 'undefined') return floatingAssistant;
-    return createPortal(floatingAssistant, document.body);
+    return floatingAssistant;
   }
 
   return (
