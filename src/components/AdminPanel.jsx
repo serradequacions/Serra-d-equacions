@@ -824,7 +824,7 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
       <header style={{ maxWidth: '1250px', margin: '0 auto 20px auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '15px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
           {logoImg && <img src={logoImg} alt="Logo" style={{ height: isMobile ? '40px' : '60px', borderRadius: '12px' }} />}
-          <h1 style={{ margin: 0, fontSize: isMobile ? '1.1rem' : '1.6rem', color: colors.textDark, fontWeight: '800' }}>Gestió del Campus (Admin)</h1>
+          <h1 style={{ margin: 0, fontSize: isMobile ? '1.1rem' : '1.6rem', color: colors.textDark, fontWeight: '800' }}>Gestió de l'Aula Digital</h1>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           {isMobile && (

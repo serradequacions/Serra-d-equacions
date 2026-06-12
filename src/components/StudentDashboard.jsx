@@ -872,7 +872,7 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
         <div style={navContentStyle}>
           <div style={logoAreaStyle} onClick={() => setView('inici')}>
             {logoImg && <img src={logoImg} alt="Logo" style={{ height: isMobile ? '35px' : '42px', borderRadius: '10px' }} />}
-            <span style={brandTextStyle(colors)}>Campus Serra</span>
+            <span style={brandTextStyle(colors)}> Aula Digital</span>
           </div>
           <div style={navLinksArea}>
             {isMobile && (
