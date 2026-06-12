@@ -1,4 +1,5 @@
 import React, { useMemo, useRef, useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 
 const DATA_CATEGORIES = {
   PLATFORM: 'plataforma',
@@ -187,6 +188,7 @@ export default function AIAssistant({
   const [isOpen, setIsOpen] = useState(variant === 'embedded');
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [aiMode, setAiMode] = useState(aiEndpoint ? 'connectat' : 'local');
   const messagesEndRef = useRef(null);
 
   const palette = colors || {
@@ -246,7 +248,8 @@ export default function AIAssistant({
         }
 
         const data = await response.json();
-        resposta = data.answer || data.resposta || data.message || '';
+        resposta = data.answer || data.resposta || data.message || data?.choices?.[0]?.message?.content || '';
+        setAiMode('connectat');
       }
 
       if (!resposta) {
@@ -256,6 +259,7 @@ export default function AIAssistant({
       setMessages((prev) => [...prev, { role: 'assistant', content: resposta }]);
     } catch (error) {
       console.error('Error a l’assistent IA:', error);
+      setAiMode('local');
       const respostaLocal = buildLocalAnswer({ message: text, studentData, materials, entregasAlumne });
       setMessages((prev) => [
         ...prev,
@@ -291,7 +295,7 @@ export default function AIAssistant({
               Assistent IA de l’alumne
             </h3>
             <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', color: variant === 'floating' ? 'rgba(255,255,255,0.85)' : palette.textLight, fontWeight: '600' }}>
-              ESO · Batxillerat · Tasques · Campus
+              {aiMode === 'connectat' ? 'IA connectada' : 'Mode local segur'} · Matemàtiques · Campus
             </p>
           </div>
         </div>
@@ -375,14 +379,23 @@ export default function AIAssistant({
   );
 
   if (variant === 'floating') {
-    return (
-      <>
+    const floatingAssistant = (
+      <div style={floatingRootStyle}>
         {isOpen && <div style={floatingPanelStyle(isMobile)}>{chatContent}</div>}
-        <button onClick={() => setIsOpen((prev) => !prev)} style={floatingButtonStyle(palette, isMobile)} aria-label="Obrir assistent IA">
+        <button
+          type="button"
+          onClick={() => setIsOpen((prev) => !prev)}
+          style={floatingButtonStyle(palette, isMobile)}
+          aria-label={isOpen ? 'Tancar assistent IA' : 'Obrir assistent IA'}
+          aria-expanded={isOpen}
+        >
           {isOpen ? '✕' : '🤖'}
         </button>
-      </>
+      </div>
     );
+
+    if (typeof document === 'undefined') return floatingAssistant;
+    return createPortal(floatingAssistant, document.body);
   }
 
   return (
@@ -407,11 +420,15 @@ const chatShellStyle = (c, variant, isMobile) => ({
   borderRadius: variant === 'floating' ? '26px' : isMobile ? '22px' : '32px',
   overflow: 'hidden',
   boxShadow: variant === 'floating' ? '0 25px 70px rgba(15, 23, 42, 0.25)' : '0 18px 45px rgba(37, 99, 235, 0.08)',
-  width: '100%'
+  width: '100%',
+  display: variant === 'floating' ? 'flex' : 'block',
+  flexDirection: variant === 'floating' ? 'column' : undefined,
+  maxHeight: variant === 'floating' ? (isMobile ? 'calc(100dvh - 104px)' : 'calc(100dvh - 128px)') : undefined
 });
 
 const assistantHeaderStyle = (c, variant, isMobile) => ({
   display: 'flex',
+  flexShrink: 0,
   justifyContent: 'space-between',
   alignItems: 'center',
   gap: '18px',
@@ -448,6 +465,7 @@ const closeButtonStyle = {
 
 const assistantStatsStyle = (c, isMobile) => ({
   display: 'grid',
+  flexShrink: 0,
   gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
   gap: '12px',
   padding: '18px 20px',
@@ -468,6 +486,7 @@ const miniStatStyle = (c, accent) => ({
 
 const assistantActionsStyle = (isMobile) => ({
   display: 'flex',
+  flexShrink: 0,
   flexWrap: 'wrap',
   gap: '10px',
   padding: isMobile ? '16px' : '18px 20px',
@@ -486,7 +505,9 @@ const assistantActionButtonStyle = (c) => ({
 });
 
 const messagesAreaStyle = (c, variant) => ({
-  height: variant === 'floating' ? '280px' : '340px',
+  height: variant === 'floating' ? 'auto' : '340px',
+  minHeight: variant === 'floating' ? '180px' : undefined,
+  flex: variant === 'floating' ? 1 : undefined,
   overflowY: 'auto',
   padding: '22px 20px',
   backgroundColor: '#ffffff'
@@ -512,6 +533,7 @@ const messageBubbleStyle = (c, role) => ({
 
 const quickPromptsStyle = {
   display: 'flex',
+  flexShrink: 0,
   flexWrap: 'wrap',
   gap: '9px',
   padding: '0 20px 18px 20px',
@@ -531,6 +553,7 @@ const quickPromptButtonStyle = (c) => ({
 
 const inputAreaStyle = (c) => ({
   display: 'flex',
+  flexShrink: 0,
   gap: '12px',
   padding: '18px 20px 20px 20px',
   borderTop: `1px solid ${c.border}`,
@@ -561,13 +584,21 @@ const sendButtonStyle = (c, disabled) => ({
   minWidth: '82px'
 });
 
+const floatingRootStyle = {
+  position: 'fixed',
+  inset: 0,
+  pointerEvents: 'none',
+  zIndex: 2147483000
+};
+
 const floatingPanelStyle = (isMobile) => ({
   position: 'fixed',
   right: isMobile ? '16px' : '28px',
   bottom: isMobile ? '86px' : '98px',
   width: isMobile ? 'calc(100vw - 32px)' : '430px',
   maxWidth: '430px',
-  zIndex: 3000
+  zIndex: 2147483000,
+  pointerEvents: 'auto'
 });
 
 const floatingButtonStyle = (c, isMobile) => ({
@@ -582,9 +613,11 @@ const floatingButtonStyle = (c, isMobile) => ({
   fontSize: isMobile ? '1.5rem' : '1.8rem',
   boxShadow: '0 18px 40px rgba(37, 99, 235, 0.35)',
   cursor: 'pointer',
-  zIndex: 3001,
+  zIndex: 2147483001,
+  pointerEvents: 'auto',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  border: '3px solid rgba(255,255,255,0.75)'
+  border: '3px solid rgba(255,255,255,0.75)',
+  transform: 'translateZ(0)' 
 });

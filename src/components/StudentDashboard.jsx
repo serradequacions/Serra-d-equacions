@@ -1388,7 +1388,7 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
           setView(novaVista);
           setMenuMobilObert(false);
         }}
-        aiEndpoint={APP_CONFIG?.studentAIAssistantEndpoint}
+        aiEndpoint="https://serra-equacions-ai.serradequacions.workers.dev/"
       />
 
       <style>{`
