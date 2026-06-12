@@ -5,6 +5,7 @@ import {
 } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import MissatgesPrivats from './MissatgesPrivats';
+import AIAssistant from './AIAssistant';
 import { normalitzarUrlCloudinary, obtenirTipusRecursCloudinary } from '../utils/cloudinary';
 
 const CLOUDINARY_URL = 'https://api.cloudinary.com/v1_1/ducevp5vb/image/upload';
@@ -898,6 +899,7 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
               <button onClick={() => { setView('materials'); setMenuMobilObert(false); }} style={navLink(view === 'materials', colors)}>Aula Virtual</button>
               <button onClick={() => { setView('exercicis'); setMenuMobilObert(false); }} style={navLink(view === 'exercicis', colors)}>🧠 Exercicis</button>
               <button onClick={() => { setView('consultes'); setMenuMobilObert(false); }} style={navLink(view === 'consultes', colors)}>💬 Consultes Privades</button>
+              <button onClick={() => { setView('assistent'); setMenuMobilObert(false); }} style={navLink(view === 'assistent', colors)}>🤖 Assistent IA</button>
               <button onClick={() => signOut(auth)} style={logoutBtn(colors)}>Tancar sessió</button>
             </div>
           </div>
@@ -1242,6 +1244,30 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
         {view === 'consultes' && (
           <div className="fade-in">
             <MissatgesPrivats user={user} isAdmin={false} colors={colors} />
+          </div>
+        )}
+
+        {view === 'assistent' && (
+          <div className="fade-in" style={{ maxWidth: '860px', margin: '0 auto', padding: isMobile ? '16px' : '32px 0' }}>
+            <div style={{ marginBottom: '24px' }}>
+              <h2 style={{ margin: 0, fontSize: isMobile ? '1.4rem' : '1.8rem', fontWeight: '950', color: colors.textDark }}>
+                🤖 Assistent IA
+              </h2>
+              <p style={{ margin: '8px 0 0 0', color: colors.textLight, fontSize: '0.95rem', fontWeight: '600' }}>
+                El teu assistent personal de Serra d'Equacions. Pregunta'm qualsevol dubte acadèmic!
+              </p>
+            </div>
+            <AIAssistant
+              variant="embedded"
+              studentData={studentData}
+              materials={materials}
+              entregasAlumne={entregasAlumne}
+              avisos={avisos}
+              colors={colors}
+              isMobile={isMobile}
+              onNavigate={setView}
+              aiEndpoint={APP_CONFIG.studentAIAssistantEndpoint}
+            />
           </div>
         )}
       </main>

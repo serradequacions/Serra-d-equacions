@@ -5,7 +5,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import LoginPage from './components/LoginPage';
 import AdminPanel from './components/AdminPanel';
 import StudentDashboard from './components/StudentDashboard';
-import AIAssistant from './components/AIAssistant';
+
 import logoImg from './logo.png';
 
 const APP_CONFIG = {
@@ -63,13 +63,6 @@ export default function App() {
   };
 
   return (
-    <>
-      <StudentDashboard user={user} APP_CONFIG={APP_CONFIG} logoImg={logoImg} />
-      <AIAssistant
-        variant="floating"
-        colors={assistantColors}
-        aiEndpoint={APP_CONFIG.studentAIAssistantEndpoint}
-      />
-    </>
+    <StudentDashboard user={user} APP_CONFIG={APP_CONFIG} logoImg={logoImg} />
   );
 }
