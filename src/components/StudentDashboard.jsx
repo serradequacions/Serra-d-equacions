@@ -1245,6 +1245,20 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
             <MissatgesPrivats user={user} isAdmin={false} colors={colors} />
           </div>
         )}
+      <AIAssistant
+        variant="floating"
+        studentData={studentData}
+        materials={materials}
+        entregasAlumne={entregasAlumne}
+        avisos={avisos}
+        colors={colors}
+        isMobile={isMobile}
+        onNavigate={(novaVista) => {
+          setView(novaVista);
+          setMenuMobilObert(false);
+        }}
+        aiEndpoint={APP_CONFIG?.studentAIAssistantEndpoint || 'https://serra-equacions-ai.serradequacions.workers.dev/'}
+      />
       </main>
 
       {isMobile && menuMobilObert && (
@@ -1376,20 +1390,6 @@ export default function StudentDashboard({ user, APP_CONFIG, logoImg }) {
         </div>
       </footer>
 
-      <AIAssistant
-        variant="floating"
-        studentData={studentData}
-        materials={materials}
-        entregasAlumne={entregasAlumne}
-        avisos={avisos}
-        colors={colors}
-        isMobile={isMobile}
-        onNavigate={(novaVista) => {
-          setView(novaVista);
-          setMenuMobilObert(false);
-        }}
-        aiEndpoint={APP_CONFIG?.studentAIAssistantEndpoint || 'https://serra-equacions-ai.serradequacions.workers.dev/'}
-      />
 
       <style>{`
         .fade-in { animation: fadeIn 0.6s cubic-bezier(0.23, 1, 0.32, 1); }

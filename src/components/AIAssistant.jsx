@@ -583,26 +583,30 @@ const sendButtonStyle = (c, disabled) => ({
 });
 
 const floatingRootStyle = {
-  position: 'fixed',
-  inset: 0,
+  position: 'sticky',
+  bottom: '24px',
+  display: 'flex',
+  justifyContent: 'flex-end',
+  alignItems: 'flex-end',
+  width: '100%',
   pointerEvents: 'none',
-  zIndex: 2147483000
+  zIndex: 5000,
+  marginTop: '28px',
+  paddingRight: '6px'
 };
 
 const floatingPanelStyle = (isMobile) => ({
-  position: 'fixed',
-  right: isMobile ? '16px' : '28px',
-  bottom: isMobile ? '86px' : '98px',
-  width: isMobile ? 'calc(100vw - 32px)' : '430px',
+  position: 'absolute',
+  right: isMobile ? '0' : '6px',
+  bottom: isMobile ? '74px' : '82px',
+  width: isMobile ? 'min(calc(100vw - 32px), 430px)' : '430px',
   maxWidth: '430px',
-  zIndex: 2147483000,
+  zIndex: 5001,
   pointerEvents: 'auto'
 });
 
 const floatingButtonStyle = (c, isMobile) => ({
-  position: 'fixed',
-  right: isMobile ? '18px' : '30px',
-  bottom: isMobile ? '18px' : '30px',
+  position: 'relative',
   width: isMobile ? '58px' : '66px',
   height: isMobile ? '58px' : '66px',
   borderRadius: '999px',
@@ -611,7 +615,7 @@ const floatingButtonStyle = (c, isMobile) => ({
   fontSize: isMobile ? '1.5rem' : '1.8rem',
   boxShadow: '0 18px 40px rgba(37, 99, 235, 0.35)',
   cursor: 'pointer',
-  zIndex: 2147483001,
+  zIndex: 5002,
   pointerEvents: 'auto',
   display: 'flex',
   alignItems: 'center',
