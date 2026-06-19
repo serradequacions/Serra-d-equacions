@@ -23,10 +23,15 @@ service cloud.firestore {
       return signedIn() && request.auth.uid == uid;
     }
 
+    // IMPORTANT: també reconeix directament el teu correu admin.
     function isStaff() {
-      return signedIn()
-        && exists(userPath(request.auth.uid))
-        && myUserData().rol in ['admin', 'professor', 'administrador'];
+      return signedIn() && (
+        request.auth.token.email == 'serradequacions@gmail.com' ||
+        (
+          exists(userPath(request.auth.uid)) &&
+          myUserData().rol in ['admin', 'professor', 'administrador']
+        )
+      );
     }
 
     function isStudent() {
@@ -54,10 +59,8 @@ service cloud.firestore {
     }
 
     match /usuaris/{userId} {
-      // L'alumne només pot llegir el seu perfil. Professorat/admin pot llegir tots els perfils.
       allow read: if isOwner(userId) || isStaff();
 
-      // Registre inicial: un usuari només pot crear el seu document com a alumne.
       allow create: if isOwner(userId)
         && hasOnlyAllowedUserFields()
         && request.resource.data.uid == request.auth.uid
@@ -66,7 +69,6 @@ service cloud.firestore {
         && validString(request.resource.data.nom, 120)
         && validString(request.resource.data.curs, 80);
 
-      // L'alumne només pot actualitzar avisosLlegits i dades bàsiques, mai el rol.
       allow update: if isOwner(userId)
         && hasOnlyAllowedUserFields()
         && request.resource.data.uid == resource.data.uid
@@ -74,7 +76,6 @@ service cloud.firestore {
         && request.resource.data.rol == resource.data.rol
         && request.resource.data.diff(resource.data).changedKeys().hasOnly(['nom', 'curs', 'avisosLlegits']);
 
-      // Professorat/admin pot gestionar perfils, inclòs canvi de curs o rol.
       allow update, delete: if isStaff();
     }
 
@@ -89,16 +90,30 @@ service cloud.firestore {
 
     match /materials/{materialId} {
       allow read: if signedIn();
+
+      // Permet materials normals i exercicis autocorregibles.
       allow create, update: if isStaff()
         && request.resource.data.keys().hasOnly([
-          'titol', 'url', 'descripcio', 'cursos', 'tipus', 'tema', 'data', 'dataLimit'
+          'titol', 'url', 'descripcio', 'cursos', 'tipus', 'tema', 'data', 'dataLimit',
+          'enunciat', 'resposta', 'alternatives', 'pista1', 'pista2', 'pistes',
+          'explicacio', 'nivell', 'tipusErrorSiFalla'
         ])
         && validString(request.resource.data.titol, 200)
         && validOptionalString(request.resource.data.url, 2000)
         && validOptionalString(request.resource.data.descripcio, 5000)
         && validCourseArray(request.resource.data.cursos)
         && validString(request.resource.data.tipus, 40)
-        && validString(request.resource.data.tema, 120);
+        && validString(request.resource.data.tema, 120)
+        && (!('enunciat' in request.resource.data) || validString(request.resource.data.enunciat, 5000))
+        && (!('resposta' in request.resource.data) || validString(request.resource.data.resposta, 500))
+        && (!('alternatives' in request.resource.data) || request.resource.data.alternatives is list)
+        && (!('pista1' in request.resource.data) || validOptionalString(request.resource.data.pista1, 1000))
+        && (!('pista2' in request.resource.data) || validOptionalString(request.resource.data.pista2, 1000))
+        && (!('pistes' in request.resource.data) || request.resource.data.pistes is list)
+        && (!('explicacio' in request.resource.data) || validOptionalString(request.resource.data.explicacio, 5000))
+        && (!('nivell' in request.resource.data) || validOptionalString(request.resource.data.nivell, 80))
+        && (!('tipusErrorSiFalla' in request.resource.data) || validOptionalString(request.resource.data.tipusErrorSiFalla, 120));
+
       allow delete: if isStaff();
     }
 
@@ -108,10 +123,8 @@ service cloud.firestore {
     }
 
     match /trameses/{tramesaId} {
-      // L'alumne només veu les seves entregues; professorat/admin veu totes.
       allow read: if isStaff() || (signedIn() && resource.data.alumneId == request.auth.uid);
 
-      // L'alumne només pot crear entregues pròpies i sempre en estat pendent.
       allow create: if isStudent()
         && request.resource.data.keys().hasOnly([
           'alumneNom', 'alumneId', 'curs', 'alumneCurs', 'materialTitol', 'materialId',
@@ -128,7 +141,6 @@ service cloud.firestore {
         && validString(request.resource.data.urlCloudinary, 2000)
         && validString(request.resource.data.fileName, 255);
 
-      // Només professorat/admin pot posar nota, comentari o canviar l'estat.
       allow update: if isStaff()
         && request.resource.data.diff(resource.data).changedKeys().hasOnly([
           'nota', 'estat', 'comentariProfessor', 'dataResposta', 'dataCorreccio'
@@ -141,12 +153,38 @@ service cloud.firestore {
       allow delete: if isStaff();
     }
 
+    match /exercicis_intents/{intentId} {
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly([
+          'alumneId', 'alumneNom', 'curs', 'exerciciId', 'materialId', 'tema', 'nivell',
+          'enunciat', 'respostaAlumne', 'respostaCorrecta', 'respostaNormalitzada',
+          'correcta', 'tipusError', 'pistesUsades', 'modeAjuda', 'haConsultatSolucio', 'data'
+        ])
+        && request.resource.data.alumneId == request.auth.uid
+        && validString(request.resource.data.alumneNom, 120)
+        && validString(request.resource.data.curs, 80)
+        && validString(request.resource.data.exerciciId, 120)
+        && validString(request.resource.data.materialId, 120)
+        && validString(request.resource.data.tema, 120)
+        && validOptionalString(request.resource.data.nivell, 80)
+        && validOptionalString(request.resource.data.enunciat, 5000)
+        && validOptionalString(request.resource.data.respostaAlumne, 500)
+        && validOptionalString(request.resource.data.respostaCorrecta, 500)
+        && (!('respostaNormalitzada' in request.resource.data) || validOptionalString(request.resource.data.respostaNormalitzada, 500))
+        && request.resource.data.correcta is bool
+        && (!('tipusError' in request.resource.data) || validOptionalString(request.resource.data.tipusError, 120))
+        && (!('pistesUsades' in request.resource.data) || request.resource.data.pistesUsades is number)
+        && (!('modeAjuda' in request.resource.data) || request.resource.data.modeAjuda is bool)
+        && (!('haConsultatSolucio' in request.resource.data) || request.resource.data.haConsultatSolucio is bool);
+
+      allow read: if isStaff() || (signedIn() && resource.data.alumneId == request.auth.uid);
+      allow update, delete: if isStaff();
+    }
+
     match /consultes_privades/{consultaId} {
-      // Professorat/admin veu totes; alumne només les seves per email.
       allow read: if isStaff()
         || (signedIn() && resource.data.alumneEmail == request.auth.token.email);
 
-      // L'alumne crea consultes pròpies sense poder escriure resposta del professor.
       allow create: if isStudent()
         && request.resource.data.keys().hasOnly([
           'alumneEmail', 'alumneNom', 'titol', 'missatge',
@@ -159,7 +197,6 @@ service cloud.firestore {
         && request.resource.data.respostaProfessor == ''
         && request.resource.data.dataResposta == null;
 
-      // Només professorat/admin pot respondre o editar la resposta.
       allow update: if isStaff()
         && request.resource.data.diff(resource.data).changedKeys().hasOnly([
           'respostaProfessor', 'dataResposta'
@@ -170,7 +207,6 @@ service cloud.firestore {
     }
 
     match /contactes_footer/{contacteId} {
-      // Formulari de contacte. Es permet crear si l'usuari està identificat.
       allow create: if signedIn()
         && request.resource.data.keys().hasOnly([
           'nom', 'email', 'missatge', 'enviatDesDe', 'dataEnviament'
@@ -182,7 +218,6 @@ service cloud.firestore {
       allow read, update, delete: if isStaff();
     }
 
-    // Tanca qualsevol altra col·lecció que no estigui contemplada.
     match /{document=**} {
       allow read, write: if false;
     }

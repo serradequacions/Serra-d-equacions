@@ -263,6 +263,8 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
   const [exerciciAlternatives, setExerciciAlternatives] = useState('');
   const [exerciciPista1, setExerciciPista1] = useState('');
   const [exerciciPista2, setExerciciPista2] = useState('');
+  const [exerciciPista3, setExerciciPista3] = useState('');
+  const [exerciciPista4, setExerciciPista4] = useState('');
   const [exerciciExplicacio, setExerciciExplicacio] = useState('');
 
   const [activeTab, setActiveTab] = useState('avisos');
@@ -615,17 +617,25 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
       };
 
       if (esExercici) {
+        const pistes = [exerciciPista1, exerciciPista2, exerciciPista3, exerciciPista4]
+          .map((pista) => pista.trim())
+          .filter(Boolean);
+
         materialNou.enunciat = exerciciEnunciat.trim();
         materialNou.resposta = exerciciResposta.trim();
         materialNou.alternatives = exerciciAlternatives
           .split('\n')
           .map((alt) => alt.trim())
           .filter(Boolean);
-        materialNou.pista1 = exerciciPista1.trim();
-        materialNou.pista2 = exerciciPista2.trim();
+        // Camps antics mantinguts per compatibilitat amb exercicis ja creats.
+        materialNou.pista1 = pistes[0] || '';
+        materialNou.pista2 = pistes[1] || '';
+        // Camp nou: permet una bastida pedagògica de més de dues passes.
+        materialNou.pistes = pistes;
         materialNou.explicacio = exerciciExplicacio.trim();
         materialNou.nivell = exerciciNivell.trim();
         materialNou.tipusErrorSiFalla = 'exercici_creat_admin';
+        materialNou.versionPedagogica = 2;
       }
 
       await addDoc(collection(db, 'materials'), materialNou);
@@ -643,6 +653,8 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
       setExerciciAlternatives('');
       setExerciciPista1('');
       setExerciciPista2('');
+      setExerciciPista3('');
+      setExerciciPista4('');
       setExerciciExplicacio('');
       alert(esExercici ? 'Exercici publicat.' : 'Material publicat.');
     } catch (e) {
@@ -936,9 +948,11 @@ export default function AdminPanel({ APP_CONFIG, logoImg }) {
                 <textarea placeholder="Enunciat de l’exercici..." value={exerciciEnunciat} onChange={(e) => setExerciciEnunciat(e.target.value)} style={{ ...textareaStyle(colors), height: '90px' }} />
                 <input placeholder="Resposta correcta" value={exerciciResposta} onChange={(e) => setExerciciResposta(e.target.value)} style={inputStyle(colors)} />
                 <textarea placeholder={'Respostes alternatives acceptades (una per línia)'} value={exerciciAlternatives} onChange={(e) => setExerciciAlternatives(e.target.value)} style={{ ...textareaStyle(colors), height: '70px' }} />
-                <input placeholder="Pista 1" value={exerciciPista1} onChange={(e) => setExerciciPista1(e.target.value)} style={inputStyle(colors)} />
-                <input placeholder="Pista 2" value={exerciciPista2} onChange={(e) => setExerciciPista2(e.target.value)} style={inputStyle(colors)} />
-                <textarea placeholder="Explicació que veurà l’alumne si encerta..." value={exerciciExplicacio} onChange={(e) => setExerciciExplicacio(e.target.value)} style={{ ...textareaStyle(colors), height: '70px' }} />
+                <input placeholder="Pista 1: orientació molt general (ex. identifica l’operació inversa)" value={exerciciPista1} onChange={(e) => setExerciciPista1(e.target.value)} style={inputStyle(colors)} />
+                <input placeholder="Pista 2: primer pas del procediment" value={exerciciPista2} onChange={(e) => setExerciciPista2(e.target.value)} style={inputStyle(colors)} />
+                <input placeholder="Pista 3: segon pas o càlcul intermedi" value={exerciciPista3} onChange={(e) => setExerciciPista3(e.target.value)} style={inputStyle(colors)} />
+                <input placeholder="Pista 4: últim pas abans de la resposta" value={exerciciPista4} onChange={(e) => setExerciciPista4(e.target.value)} style={inputStyle(colors)} />
+                <textarea placeholder="Solució pas a pas. Exemple: 2x + 4 = 14 → 2x = 10 → x = 5" value={exerciciExplicacio} onChange={(e) => setExerciciExplicacio(e.target.value)} style={{ ...textareaStyle(colors), height: '80px' }} />
               </div>
             )}
 

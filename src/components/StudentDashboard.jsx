@@ -84,13 +84,69 @@ const normalitzarRespostaExercici = (valor = '') =>
     .replaceAll(',', '.')
     .replaceAll('·', '*')
     .replaceAll('−', '-')
+    .replaceAll('–', '-')
     .replaceAll('²', '^2')
     .replaceAll('’', "'");
 
+const netejarRespostaMatematica = (valor = '') => {
+  const normalitzada = normalitzarRespostaExercici(valor);
+  // Accepta respostes escrites com "x=5", "solució: 5" o simplement "5".
+  return normalitzada
+    .replace(/^solucio[:=]/, '')
+    .replace(/^solució[:=]/, '')
+    .replace(/^resposta[:=]/, '')
+    .replace(/^[a-z]([_0-9])?=/, '');
+};
+
+const convertirNombreResposta = (valor = '') => {
+  const text = netejarRespostaMatematica(valor);
+
+  if (/^-?\d+(\.\d+)?$/.test(text)) return Number(text);
+
+  const fraccio = text.match(/^(-?\d+(?:\.\d+)?)\/(-?\d+(?:\.\d+)?)$/);
+  if (fraccio) {
+    const numerador = Number(fraccio[1]);
+    const denominador = Number(fraccio[2]);
+    if (denominador !== 0) return numerador / denominador;
+  }
+
+  return null;
+};
+
 const respostaEsCorrecta = (respostaAlumne, exercici) => {
-  const resposta = normalitzarRespostaExercici(respostaAlumne);
-  const correctes = [exercici.resposta, ...(exercici.alternatives || [])].map(normalitzarRespostaExercici);
-  return correctes.includes(resposta);
+  const respostaText = netejarRespostaMatematica(respostaAlumne);
+  const correctes = [exercici.resposta, ...(exercici.alternatives || [])].filter(Boolean);
+
+  // Comparació textual flexible.
+  if (correctes.map(netejarRespostaMatematica).includes(respostaText)) return true;
+
+  // Comparació numèrica amb tolerància: accepta 0.5, 1/2 i x=0,5.
+  const respostaNumerica = convertirNombreResposta(respostaAlumne);
+  if (respostaNumerica === null) return false;
+
+  return correctes.some((correcta) => {
+    const correctaNumerica = convertirNombreResposta(correcta);
+    return correctaNumerica !== null && Math.abs(respostaNumerica - correctaNumerica) < 0.0001;
+  });
+};
+
+const obtenirPistesExercici = (exercici = {}) => {
+  const pistes = Array.isArray(exercici.pistes) ? exercici.pistes : [];
+  return [
+    ...pistes,
+    exercici.pista1,
+    exercici.pista2,
+    exercici.pista3,
+    exercici.pista4
+  ]
+    .map((pista) => String(pista || '').trim())
+    .filter(Boolean)
+    .filter((pista, index, array) => array.indexOf(pista) === index);
+};
+
+const generarMissatgeAjuda = (exercici = {}) => {
+  const primeraPista = obtenirPistesExercici(exercici)[0];
+  return primeraPista || 'Revisa el procediment: fes la mateixa operació als dos costats i comprova el resultat.';
 };
 /**
  * StudentDashboard.jsx - VERSIÓ INTEGRAL REPARADA (+500 línies)
@@ -1344,9 +1400,23 @@ function ExerciciAutocorregibleCard({ exercici, user, studentData, colors }) {
   const [resposta, setResposta] = useState('');
   const [feedback, setFeedback] = useState(null);
   const [pistesVisibles, setPistesVisibles] = useState(0);
+  const [mostraSolucio, setMostraSolucio] = useState(false);
+  const [modeAjuda, setModeAjuda] = useState(false);
   const [guardant, setGuardant] = useState(false);
+  const inputRespostaRef = useRef(null);
 
-  const registrarIntent = async (respostaAlumne, correcta) => {
+  const pistes = useMemo(() => obtenirPistesExercici(exercici), [exercici]);
+  const totalPistes = pistes.length;
+  const explicacioFinal = exercici.explicacio?.trim() || exercici.solucioPasAPas?.trim() || '';
+
+  useEffect(() => {
+    setResposta('');
+    setFeedback(null);
+    setPistesVisibles(0);
+    setMostraSolucio(false);
+  }, [exercici?.id]);
+
+  const registrarIntent = async (respostaAlumne, correcta, opcio = {}) => {
     if (!user?.uid) return;
 
     await addDoc(collection(db, 'exercicis_intents'), {
@@ -1359,8 +1429,12 @@ function ExerciciAutocorregibleCard({ exercici, user, studentData, colors }) {
       nivell: exercici.nivell || '',
       enunciat: exercici.enunciat || exercici.descripcio || '',
       respostaAlumne,
+      respostaNormalitzada: netejarRespostaMatematica(respostaAlumne),
       respostaCorrecta: exercici.resposta || '',
       correcta,
+      pistesUsades: opcio.pistesUsades ?? pistesVisibles,
+      modeAjuda,
+      solucioMostrada: mostraSolucio,
       tipusError: correcta ? null : (exercici.tipusErrorSiFalla || 'error_exercici_autocorregible'),
       data: serverTimestamp()
     });
@@ -1370,7 +1444,11 @@ function ExerciciAutocorregibleCard({ exercici, user, studentData, colors }) {
     const respostaAlumne = resposta || '';
 
     if (!respostaAlumne.trim()) {
-      setFeedback({ tipus: 'error', text: 'Escriu una resposta abans de corregir.' });
+      setFeedback({
+        tipus: 'error',
+        text: 'Escriu una resposta abans de corregir. Pots demanar una pista si no saps per on començar.'
+      });
+      inputRespostaRef.current?.focus();
       return;
     }
 
@@ -1379,20 +1457,49 @@ function ExerciciAutocorregibleCard({ exercici, user, studentData, colors }) {
 
     try {
       await registrarIntent(respostaAlumne, correcta);
-      setFeedback(
-        correcta
-          ? { tipus: 'correcte', text: `Molt bé! ${exercici.explicacio || 'Resposta correcta.'}` }
-          : { tipus: 'error', text: `Encara no és correcte. ${exercici.pista1 || 'Revisa el procediment i torna-ho a provar.'}` }
-      );
+      if (correcta) {
+        setFeedback({
+          tipus: 'correcte',
+          text: explicacioFinal
+            ? `Molt bé! ${explicacioFinal}`
+            : 'Molt bé! La resposta és correcta. Ara prova d’explicar mentalment quin procediment has seguit.'
+        });
+      } else {
+        setFeedback({
+          tipus: 'error',
+          text: `Encara no és correcte. ${generarMissatgeAjuda(exercici)}`
+        });
+        setPistesVisibles((actual) => Math.min(Math.max(actual, 1), Math.max(totalPistes, 1)));
+      }
     } catch (error) {
       console.error('Error registrant intent autocorregible:', error);
-      setFeedback(
-        correcta
-          ? { tipus: 'correcte', text: 'Resposta correcta. No s’ha pogut guardar l’intent, però pots continuar.' }
-          : { tipus: 'error', text: `No és correcte. ${exercici.pista1 || 'Revisa el procediment.'} A més, no s’ha pogut guardar l’intent.` }
-      );
+      setFeedback({
+        tipus: correcta ? 'correcte' : 'error',
+        text: correcta
+          ? 'Resposta correcta. No s’ha pogut guardar l’intent, però pots continuar.'
+          : `No és correcte. ${generarMissatgeAjuda(exercici)} A més, no s’ha pogut guardar l’intent.`
+      });
     } finally {
       setGuardant(false);
+    }
+  };
+
+  const mostrarUnaPista = () => {
+    setPistesVisibles((actual) => Math.min(actual + 1, Math.max(totalPistes, 1)));
+    setFeedback(null);
+  };
+
+  const veureSolucio = async () => {
+    setMostraSolucio(true);
+    setPistesVisibles(totalPistes);
+    setFeedback({
+      tipus: 'info',
+      text: explicacioFinal || `La resposta correcta és ${exercici.resposta}. Revisa el camí i torna-ho a provar sense mirar.`
+    });
+    try {
+      await registrarIntent(resposta || '[solució consultada]', false, { pistesUsades: totalPistes });
+    } catch (error) {
+      console.error('Error registrant consulta de solució:', error);
     }
   };
 
@@ -1400,36 +1507,81 @@ function ExerciciAutocorregibleCard({ exercici, user, studentData, colors }) {
     setResposta('');
     setFeedback(null);
     setPistesVisibles(0);
+    setMostraSolucio(false);
+    inputRespostaRef.current?.focus();
   };
 
+  const feedbackColors = {
+    correcte: { bg: '#f0fdf4', border: colors.success, text: '#166534', icon: '✅' },
+    error: { bg: '#fef2f2', border: colors.danger, text: '#991b1b', icon: '❌' },
+    info: { bg: '#eff6ff', border: colors.primary, text: '#1e3a8a', icon: 'ℹ️' }
+  };
+  const feedbackStyle = feedbackColors[feedback?.tipus] || feedbackColors.info;
+
   return (
-    <div style={{ marginTop: '35px', padding: '28px', backgroundColor: '#f8fafc', border: `1px solid ${colors.border}`, borderRadius: '24px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'flex-start', marginBottom: '18px' }}>
-        <h3 style={{ margin: 0, fontSize: '1.5rem', fontWeight: '900', color: colors.textDark }}>Exercici autocorregible</h3>
-        {exercici.nivell && (
-          <span style={{ fontSize: '0.75rem', fontWeight: '900', color: colors.primary, backgroundColor: '#eff6ff', padding: '6px 10px', borderRadius: '999px', textTransform: 'uppercase' }}>
-            {exercici.nivell}
-          </span>
-        )}
+    <section
+      aria-labelledby={`exercici-${exercici.id}-titol`}
+      style={{ marginTop: '35px', padding: '28px', backgroundColor: '#f8fafc', border: `1px solid ${colors.border}`, borderRadius: '24px' }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'flex-start', marginBottom: '18px', flexWrap: 'wrap' }}>
+        <div>
+          <h3 id={`exercici-${exercici.id}-titol`} style={{ margin: 0, fontSize: '1.5rem', fontWeight: '900', color: colors.textDark }}>
+            Exercici autocorregible
+          </h3>
+          <p style={{ margin: '6px 0 0', color: colors.textLight, fontWeight: '650', fontSize: '0.92rem' }}>
+            Resol-lo al teu ritme. Les pistes no resten: t’ajuden a aprendre el procediment.
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          {exercici.nivell && (
+            <span style={{ fontSize: '0.75rem', fontWeight: '900', color: colors.primary, backgroundColor: '#eff6ff', padding: '6px 10px', borderRadius: '999px', textTransform: 'uppercase' }}>
+              {exercici.nivell}
+            </span>
+          )}
+          <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', fontWeight: '800', color: colors.textDark, backgroundColor: '#fff', padding: '7px 10px', borderRadius: '999px', border: `1px solid ${colors.border}` }}>
+            <input
+              type="checkbox"
+              checked={modeAjuda}
+              onChange={(e) => setModeAjuda(e.target.checked)}
+            />
+            Mode ajuda
+          </label>
+        </div>
       </div>
 
-      <div style={{ fontSize: '1.08rem', color: colors.textDark, fontWeight: '800', lineHeight: 1.6, marginBottom: '18px', whiteSpace: 'pre-wrap' }}>
+      {modeAjuda && (
+        <div style={{ marginBottom: '16px', padding: '13px 15px', backgroundColor: '#ecfeff', borderLeft: `4px solid ${colors.primary}`, borderRadius: '10px', color: colors.textDark, lineHeight: 1.55 }}>
+          <strong>Estratègia:</strong> identifica la incògnita, desfés primer les sumes/restes i després les multiplicacions/divisions. Fes sempre la mateixa operació als dos costats.
+        </div>
+      )}
+
+      <div style={{ fontSize: modeAjuda ? '1.18rem' : '1.08rem', color: colors.textDark, fontWeight: '800', lineHeight: 1.6, marginBottom: '18px', whiteSpace: 'pre-wrap' }}>
         {exercici.enunciat || exercici.descripcio || 'Aquest exercici encara no té enunciat.'}
       </div>
 
+      <label htmlFor={`resposta-${exercici.id}`} style={{ display: 'block', fontSize: '0.9rem', color: colors.textDark, fontWeight: '850', marginBottom: '8px' }}>
+        La teva resposta
+      </label>
       <input
+        id={`resposta-${exercici.id}`}
+        ref={inputRespostaRef}
         type="text"
         value={resposta}
         onChange={(e) => setResposta(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === 'Enter') corregirExercici();
         }}
-        placeholder="Escriu la resposta..."
-        style={{ width: '100%', boxSizing: 'border-box', border: `1.5px solid ${colors.border}`, borderRadius: '14px', padding: '14px 16px', fontSize: '1rem', fontWeight: '700', color: colors.textDark, outline: 'none', marginBottom: '14px', backgroundColor: '#fff' }}
+        placeholder="Exemple: x = 5, 5 o 1/2"
+        aria-describedby={`ajuda-resposta-${exercici.id}`}
+        style={{ width: '100%', boxSizing: 'border-box', border: `1.5px solid ${colors.border}`, borderRadius: '14px', padding: modeAjuda ? '16px 18px' : '14px 16px', fontSize: modeAjuda ? '1.08rem' : '1rem', fontWeight: '700', color: colors.textDark, outline: 'none', marginBottom: '8px', backgroundColor: '#fff' }}
       />
+      <div id={`ajuda-resposta-${exercici.id}`} style={{ marginBottom: '14px', color: colors.textLight, fontSize: '0.85rem', lineHeight: 1.45 }}>
+        Pots escriure la resposta amb decimals, fraccions senzilles o amb la incògnita: <strong>x=5</strong>.
+      </div>
 
       <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
         <button
+          type="button"
           onClick={corregirExercici}
           disabled={guardant}
           style={{ padding: '11px 16px', borderRadius: '12px', backgroundColor: colors.primary, color: 'white', fontWeight: '900', cursor: guardant ? 'wait' : 'pointer' }}
@@ -1437,12 +1589,22 @@ function ExerciciAutocorregibleCard({ exercici, user, studentData, colors }) {
           {guardant ? 'Guardant...' : 'Corregir'}
         </button>
         <button
-          onClick={() => setPistesVisibles((actual) => Math.min(actual + 1, 2))}
-          style={{ padding: '11px 16px', borderRadius: '12px', backgroundColor: '#fff', color: colors.textDark, border: `1px solid ${colors.border}`, fontWeight: '900', cursor: 'pointer' }}
+          type="button"
+          onClick={mostrarUnaPista}
+          disabled={totalPistes > 0 && pistesVisibles >= totalPistes}
+          style={{ padding: '11px 16px', borderRadius: '12px', backgroundColor: '#fff', color: colors.textDark, border: `1px solid ${colors.border}`, fontWeight: '900', cursor: totalPistes > 0 && pistesVisibles >= totalPistes ? 'not-allowed' : 'pointer', opacity: totalPistes > 0 && pistesVisibles >= totalPistes ? 0.65 : 1 }}
         >
-          Pista
+          Necessit ajuda {totalPistes > 0 ? `(${Math.min(pistesVisibles, totalPistes)}/${totalPistes})` : ''}
         </button>
         <button
+          type="button"
+          onClick={veureSolucio}
+          style={{ padding: '11px 16px', borderRadius: '12px', backgroundColor: '#fff7ed', color: '#9a3412', border: '1px solid #fed7aa', fontWeight: '900', cursor: 'pointer' }}
+        >
+          Mostra solució pas a pas
+        </button>
+        <button
+          type="button"
           onClick={reiniciarExercici}
           style={{ padding: '11px 16px', borderRadius: '12px', backgroundColor: 'white', color: colors.textLight, border: `1px solid ${colors.border}`, fontWeight: '900', cursor: 'pointer' }}
         >
@@ -1450,23 +1612,29 @@ function ExerciciAutocorregibleCard({ exercici, user, studentData, colors }) {
         </button>
       </div>
 
-      {pistesVisibles >= 1 && exercici.pista1 && (
-        <div style={{ marginTop: '16px', padding: '13px 15px', backgroundColor: '#fffbeb', borderLeft: `4px solid ${colors.warning}`, borderRadius: '10px', color: colors.textDark, fontWeight: '650', lineHeight: 1.55 }}>
-          💡 {exercici.pista1}
+      {pistesVisibles > 0 && (
+        <div style={{ marginTop: '16px', display: 'grid', gap: '10px' }} aria-live="polite">
+          {(totalPistes > 0 ? pistes.slice(0, pistesVisibles) : [generarMissatgeAjuda(exercici)]).map((pista, index) => (
+            <div key={`${pista}-${index}`} style={{ padding: '13px 15px', backgroundColor: index === 0 ? '#fffbeb' : '#fff7ed', borderLeft: `4px solid ${colors.warning}`, borderRadius: '10px', color: colors.textDark, fontWeight: '650', lineHeight: 1.55 }}>
+              💡 <strong>Pista {index + 1}:</strong> {pista}
+            </div>
+          ))}
         </div>
       )}
-      {pistesVisibles >= 2 && exercici.pista2 && (
-        <div style={{ marginTop: '10px', padding: '13px 15px', backgroundColor: '#fff7ed', borderLeft: `4px solid ${colors.warning}`, borderRadius: '10px', color: colors.textDark, fontWeight: '650', lineHeight: 1.55 }}>
-          💡 {exercici.pista2}
+
+      {mostraSolucio && (
+        <div style={{ marginTop: '16px', padding: '15px 16px', backgroundColor: '#f8fafc', border: `1px dashed ${colors.primary}`, borderRadius: '14px', color: colors.textDark, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+          <strong>Solució orientativa:</strong>{' '}
+          {explicacioFinal || `La resposta correcta és ${exercici.resposta || 'la indicada pel professorat'}. Torna a provar l’exercici sense mirar la solució.`}
         </div>
       )}
 
       {feedback && (
-        <div style={{ marginTop: '16px', padding: '14px 16px', borderRadius: '14px', backgroundColor: feedback.tipus === 'correcte' ? '#f0fdf4' : '#fef2f2', border: `1px solid ${feedback.tipus === 'correcte' ? colors.success : colors.danger}`, color: feedback.tipus === 'correcte' ? colors.success : colors.danger, fontWeight: '800', lineHeight: 1.55 }}>
-          {feedback.tipus === 'correcte' ? '✅ ' : '❌ '}{feedback.text}
+        <div role="status" aria-live="polite" style={{ marginTop: '16px', padding: '14px 16px', borderRadius: '14px', backgroundColor: feedbackStyle.bg, border: `1px solid ${feedbackStyle.border}`, color: feedbackStyle.text, fontWeight: '800', lineHeight: 1.55 }}>
+          {feedbackStyle.icon} {feedback.text}
         </div>
       )}
-    </div>
+    </section>
   );
 }
 

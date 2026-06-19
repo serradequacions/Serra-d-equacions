@@ -35,7 +35,7 @@ export default function App() {
   if (loading) return (
     <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f8fafc', fontFamily: 'sans-serif' }}>
       <div style={{ textAlign: 'center' }}>
-        <p style={{ color: '#64748b' }}>Carregant aplicació...</p>
+        <p style={{ color: '#64748b' }}>Carregant Serra d’Equacions...</p>
       </div>
     </div>
   );
@@ -47,20 +47,6 @@ export default function App() {
   if (user.email === APP_CONFIG.adminEmail) {
     return <AdminPanel APP_CONFIG={APP_CONFIG} logoImg={logoImg} />;
   }
-
-  const assistantColors = {
-    primary: '#2563eb',
-    primaryDark: '#1d4ed8',
-    bg: '#f8fafc',
-    card: '#ffffff',
-    textDark: '#0f172a',
-    textLight: '#64748b',
-    border: '#e2e8f0',
-    danger: '#ef4444',
-    success: '#10b981',
-    accent: '#3b82f6',
-    warning: '#f59e0b'
-  };
 
   return (
     <StudentDashboard user={user} APP_CONFIG={APP_CONFIG} logoImg={logoImg} />
